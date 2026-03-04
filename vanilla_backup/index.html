@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sabes de Fútbol</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Special+Elite&family=VT323&display=swap" rel="stylesheet">
+
+    <!-- Styles -->
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <main class="container">
+
+        <!-- COMPONENTE 1: BOLETA DIGITAL -->
+        <section class="boleta-digital card-retro">
+            <div class="boleta-header">
+                <h1 class="logo-sabes">SABES DE FUTBOL</h1>
+                <div class="boleta-numero">Nº <span class="num-rojo">007842</span></div>
+            </div>
+
+            <div class="boleta-sello">LOTERÍA NACIONAL</div>
+
+            <div class="boleta-grid">
+                <div class="row header-row">
+                    <span class="partido">PARTIDO</span>
+                    <span class="opcion">L</span>
+                    <span class="opcion">E</span>
+                    <span class="opcion">V</span>
+                </div>
+
+                <!-- Generaremos 13 filas con JS o HTML directo -->
+                <div id="filas-boleta"></div>
+            </div>
+
+            <button class="btn-jugar">JUGAR BOLETA</button>
+        </section>
+
+
+        <!-- COLUMNA CENTRAL: PANEL Y PERFIL -->
+        <div class="col-central">
+            <!-- COMPONENTE 4: PERFIL DE JUGADOR -->
+            <section class="perfil-jugador card-retro flex-row">
+                <div class="foto-carnet">
+                    <!-- img placeholder -->
+                    <div class="foto-placeholder"></div>
+                </div>
+                <div class="datos-socio">
+                    <h2>CARNET DE SOCIO</h2>
+                    <p>Socio: <span class="dato">XXXXXXXXX</span></p>
+                    <p>Cat: <span class="dato">YYYYYYYYYYYYYY</span></p>
+                    <p class="historial">Historial: <span class="dato">12 aciertos (Apertura '92)</span></p>
+                </div>
+            </section>
+
+            <!-- COMPONENTE 2: PANEL DE SORTEO -->
+            <section class="panel-sorteo card-pizarron">
+                <h2 class="titulo-pizarron">RESULTADOS EN VIVO</h2>
+
+                <div class="ruleta-container">
+                    <div class="ruleta-slot" id="slot-1">?</div>
+                </div>
+
+                <div class="ticker-resultados">
+                    <div class="ticker-text">BOCA 2 - 1 RIVER | RACING 0 - 0 INDEPENDIENTE | SAN LORENZO 1 - 0 HURACAN |
+                    </div>
+                </div>
+            </section>
+        </div>
+
+
+        <!-- COMPONENTE 3: TABLA DE PREMIOS -->
+        <section class="tabla-premios card-madera">
+            <h2>POZO ACUMULADO</h2>
+            <div class="premio-mayor glow">
+                <span class="currency">$</span>
+                <span class="amount" id="pozo-total">1.000.000</span>
+            </div>
+
+            <ul class="lista-premios">
+                <li class="premio-item">
+                    <span>13 Aciertos</span>
+                    <span class="dorado">$500.000</span>
+                </li>
+                <li class="premio-item">
+                    <span>12 Aciertos</span>
+                    <span>$50.000</span>
+                </li>
+                <li class="premio-item">
+                    <span>11 Aciertos</span>
+                    <span>$10.000</span>
+                </li>
+                <li class="premio-item">
+                    <span>10 Aciertos</span>
+                    <span>$5.000</span>
+                </li>
+            </ul>
+        </section>
+
+    </main>
+
+    <!-- Audio placeholders -->
+    <audio id="audio-estadio" loop src=""></audio>
+    <audio id="audio-click" src=""></audio>
+    <audio id="audio-gol" src=""></audio>
+    <audio id="audio-fanfarria" src=""></audio>
+    <audio id="audio-derrota" src=""></audio>
+
+    <script src="script.js"></script>
+</body>
+
+</html>
