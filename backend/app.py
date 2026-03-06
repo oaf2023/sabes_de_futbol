@@ -180,7 +180,8 @@ def guardar_jugada():
         binario = codificar_jugada(selecciones)
         nueva = JugadaUsuario(
             usuario_dni=dni,
-            fecha_sorteo_id=fecha_activa.id,
+            nro_fecha=fecha_activa.nro_fecha,      # columna NOT NULL en la DB actual
+            fecha_sorteo_id=fecha_activa.id,        # FK para relaciones del modelo
             jugada_binaria=binario,
             monto_apostado=1
         )

@@ -108,7 +108,8 @@ class JugadaUsuario(db.Model):
 
     id              = db.Column(db.Integer, primary_key=True, autoincrement=True)
     usuario_dni     = db.Column(db.String(20), db.ForeignKey('usuarios.dni'), nullable=False)
-    fecha_sorteo_id = db.Column(db.Integer, db.ForeignKey('fechas_sorteo.id'), nullable=False)
+    nro_fecha       = db.Column(db.Integer, nullable=False)  # columna legacy NOT NULL en la DB
+    fecha_sorteo_id = db.Column(db.Integer, db.ForeignKey('fechas_sorteo.id'), nullable=True)
     jugada_binaria  = db.Column(db.String(500), nullable=False) # Aumentado para más partidos
     aciertos        = db.Column(db.Integer, nullable=True)
     monto_apostado  = db.Column(db.Integer, default=1)
