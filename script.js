@@ -596,19 +596,48 @@ async function mostrarHistorial() {
         container.innerHTML = '<p class="no-jugadas">No tenés jugadas registradas aún.</p>';
     } else {
         const html = jugadas.sort((a, b) => b.id - a.id).map(j => `
-            <div class="ticket-historial card-retro">
+            <div class="ticket-historial card-retro" onclick="verDetalleJugada(${j.id})" style="cursor:pointer;">
                 <div class="ticket-header-sm">
                     <span>JUGADA #${String(j.id).padStart(5, '0')}</span>
                     <span class="fecha-sm">${j.fecha || ''}</span>
                 </div>
                 <div class="ticket-body-sm">
                     <span class="aciertos-sm">${j.aciertos ?? 0} ACIERTOS</span>
+                    <div style="font-size:0.65rem;color:var(--color-primario);margin-top:4px;">Hacé clic para ver detalle</div>
                 </div>
             </div>
         `).join('');
         container.innerHTML = html;
         container.scrollIntoView({ behavior: 'smooth' });
     }
+}
+
+async function verDetalleJugada(id) {
+    if (typeof apiGetDetalleJugada !== 'function') {
+        alert('Función no disponible.');
+        return;
+    }
+    const { ok, data, error } = await apiGetDetalleJugada(id);
+    if (!ok) { alert('Error al obtener el detalle: ' + error); return; }
+
+    mostrarTicketConDetalle(data);
+}
+
+function mostrarTicketConDetalle(data) {
+    // Cerrar historial y mostrar el ticket con los datos de la jugada del historial
+    cerrarHistorial();
+    renderTicketVisual(data.id, data.partidos);
+
+    const containerTicket = document.getElementById('container-ticket');
+    if (containerTicket) {
+        containerTicket.classList.remove('oculto');
+        setTimeout(() => containerTicket.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
+    }
+    // Actualizar fecha y timestamp en el ticket
+    const elFecha = document.getElementById('t-fecha');
+    if (elFecha) elFecha.textContent = parseInt(data.nro_fecha);
+    const elTimestamp = document.getElementById('t-timestamp');
+    if (elTimestamp) elTimestamp.textContent = data.fecha_hora;
 }
 
 function cerrarHistorial() {

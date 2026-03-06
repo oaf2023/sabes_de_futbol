@@ -1,19 +1,27 @@
 """
 wsgi.py — Entry point para PythonAnywhere WSGI
 
-En PythonAnywhere, configurar la Web App así:
-  Source code:    /home/<tu_usuario>/sabes_de_futbol/backend
-  Working dir:    /home/<tu_usuario>/sabes_de_futbol/backend
+Configurar en el panel Web de PythonAnywhere:
+  Source code:    /home/<usuario>/sabes_de_futbol/backend
+  Working dir:    /home/<usuario>/sabes_de_futbol/backend
   WSGI file:      este archivo (wsgi.py)
-  Python path:    /home/<tu_usuario>/sabes_de_futbol/backend
+
+Variables de entorno (panel Web → Environment variables):
+  JWT_SECRET_KEY   → clave larga y aleatoria
+  ADMIN_SECRET     → clave para el panel admin
 """
 
 import sys
 import os
 
-# Agregar el directorio del backend al path de Python
-project_dir = os.path.dirname(os.path.abspath(__file__))
-if project_dir not in sys.path:
-    sys.path.insert(0, project_dir)
+# Directorio del backend (donde vive este archivo y app.py)
+backend_dir = os.path.dirname(os.path.abspath(__file__))
+if backend_dir not in sys.path:
+    sys.path.insert(0, backend_dir)
+
+# Raíz del proyecto (necesaria para servir index.html, style.css, js/, etc.)
+project_root = os.path.abspath(os.path.join(backend_dir, '..'))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 
 from app import app as application  # PythonAnywhere busca 'application'

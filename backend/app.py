@@ -317,13 +317,48 @@ def comprar_fichas():
         'fichas_actuales': usuario.fichas
     }), 200
 
+
+@app.route('/api/jugada/<int:jugada_id>', methods=['GET'])
+def obtener_detalle_jugada(jugada_id):
+    jugada = JugadaUsuario.query.get(jugada_id)
+    if not jugada:
+        return jsonify({'error': 'Jugada no encontrada'}), 404
+
+    fecha = FechaSorteo.query.get(jugada.fecha_sorteo_id)
+    if not fecha:
+        return jsonify({'error': 'Fecha no encontrada'}), 404
+
+    partidos = sorted(fecha.partidos, key=lambda x: x.orden)
+    selecciones = decodificar_jugada(jugada.jugada_binaria)
+
+    partidos_res = []
+    for i, p in enumerate(partidos):
+        partidos_res.append({
+            'nombre': f"{p.equipo_local} vs {p.equipo_visitante}",
+            'seleccion': selecciones[i] if i < len(selecciones) else None,
+            'resultado': p.resultado_real
+        })
+
+    return jsonify({
+        'id': jugada.id,
+        'nro_fecha': f"{fecha.nro_fecha:05d}",
+        'aciertos': jugada.aciertos,
+        'fecha_hora': jugada.fecha_registro.strftime('%d/%m/%Y %H:%M'),
+        'partidos': partidos_res
+    }), 200
+
+# STATIC_DIR: ruta absoluta a la raíz del proyecto (donde están index.html, style.css, etc.)
+# Usa ruta absoluta para que funcione tanto en local como en PythonAnywhere
+STATIC_DIR = os.path.abspath(os.path.join(BASE_DIR, '..'))
+
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
 def serve(path):
-    if path != "" and os.path.exists(os.path.join(BASE_DIR, '..', path)):
-        return send_from_directory(os.path.join(BASE_DIR, '..'), path)
+    """Sirve el frontend estático desde la raíz del proyecto."""
+    if path != "" and os.path.exists(os.path.join(STATIC_DIR, path)):
+        return send_from_directory(STATIC_DIR, path)
     else:
-        return send_from_directory(os.path.join(BASE_DIR, '..'), 'index.html')
+        return send_from_directory(STATIC_DIR, 'index.html')
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

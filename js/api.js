@@ -102,3 +102,8 @@ async function apiHistorial(dni) {
 async function apiComprarFichas(dni) {
     return apiCall('/api/comprar-fichas', 'POST', { dni });
 }
+
+/** Obtener detalle completo de una jugada específica */
+async function apiGetDetalleJugada(jugadaId) {
+    return apiCall(`/api/jugada/${jugadaId}`, 'GET');
+}
