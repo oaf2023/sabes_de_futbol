@@ -24,6 +24,17 @@ document.addEventListener('DOMContentLoaded', () => {
     // Actualizar fecha en el panel
     actualizarFechaReloj();
 
+    // Verificar si volvemos de un pago de Mercado Pago
+    verificarRetornoPago();
+
+    // Eventos de botones de compra
+    const btnCompra = document.getElementById('btn-comprar-fichas');
+    if (btnCompra) {
+        btnCompra.addEventListener('click', () => {
+            document.getElementById('modal-compra-fichas').classList.remove('oculto');
+        });
+    }
+
     // Verificar sesión guardada en sessionStorage
     const sesion = sessionStorage.getItem('sabes_usuario');
     if (sesion) {
@@ -685,5 +696,71 @@ function triggerFailAnimation() {
     if (boleta) {
         boleta.classList.add('derrota-anim');
         setTimeout(() => boleta.classList.remove('derrota-anim'), 2000);
+    }
+}
+
+// ============================================================
+// LÓGICA DE PAGOS (MERCADO PAGO)
+// ============================================================
+
+/**
+ * Inicia el proceso de pago llamando al backend para obtener la URL de checkout
+ */
+async function comprarPaquete(paquete) {
+    if (!usuarioActual) return;
+    
+    // Feedback visual "PROCESANDO..."
+    const modal = document.getElementById('modal-compra-fichas');
+    const content = modal.querySelector('.compra-fichas-card');
+    const originalHTML = content.innerHTML;
+    content.innerHTML = `<h3>PROCESANDO...</h3><p>Estamos generando tu orden en Mercado Pago. Un momento...</p>`;
+
+    const { ok, data, error } = await apiIniciarPago(usuarioActual.dni, paquete);
+    
+    if (ok && data.checkout_url) {
+        // Redirigir a Mercado Pago
+        window.location.href = data.checkout_url;
+    } else {
+        alert("Error al iniciar el pago: " + (error || "La pasarela no está disponible."));
+        content.innerHTML = originalHTML; // Restaurar
+    }
+}
+
+function cerrarModalCompra() {
+    document.getElementById('modal-compra-fichas').classList.add('oculto');
+}
+
+/**
+ * Revisa la URL para ver si el usuario fue redirigido después de un pago
+ */
+async function verificarRetornoPago() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const status = urlParams.get('pago');
+    const prefId = urlParams.get('preference_id');
+
+    if (!status) return;
+
+    if (status === 'success') {
+        showToast("¡Pago exitoso! Estamos acreditando tus fichas...", "success");
+        // Limpiar URL
+        window.history.replaceState({}, document.title, window.location.pathname);
+        
+        // Polling corto para verificar acreditación (máx 3 intentos)
+        let intentos = 0;
+        const check = setInterval(async () => {
+            intentos++;
+            const { ok, data } = await apiGetPagoEstado(prefId);
+            if (ok && data.estado === 'aprobado') {
+                clearInterval(check);
+                actualizarFichasUI();
+                showToast(`¡Acreditadas ${data.fichas_acreditadas} fichas! Total: ${data.fichas_actuales}`, "success");
+                triggerSuccessAnimation();
+            }
+            if (intentos > 5) clearInterval(check);
+        }, 2000);
+
+    } else if (status === 'failure') {
+        showToast("El pago fue rechazado o falló. Intentá nuevamente.", "error");
+        window.history.replaceState({}, document.title, window.location.pathname);
     }
 }

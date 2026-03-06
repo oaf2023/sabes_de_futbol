@@ -245,6 +245,7 @@ body {
     width: 450px;
     min-width: 350px;
 }
+
 /* COLUMNA DERECHA */
 .col-derecha {
     display: flex;
@@ -594,6 +595,73 @@ body {
     animation: arrugarPapel 1.5s forwards;
 }
 
+/* COMPRA DE FICHAS */
+.compra-fichas-card {
+    max-width: 450px !important;
+    text-align: center;
+}
+
+.paquetes-container {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    margin: 20px 0;
+    flex-wrap: wrap;
+}
+
+.paquete-item {
+    flex: 1;
+    min-width: 120px;
+    padding: 15px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    transition: transform 0.2s, box-shadow 0.2s;
+    background: #fdf5e6;
+    /* Estilo papel viejo */
+    color: #333;
+    border: 3px solid #8b4513;
+}
+
+.paquete-item:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.4);
+}
+
+.paquete-item.selected {
+    border: 5px solid var(--color-rojo);
+    box-shadow: 0 0 10px var(--color-rojo);
+    background: #fff;
+}
+
+.paquete-titulo {
+    font-family: var(--font-titulo);
+    font-size: 0.9rem;
+    color: #666;
+    margin-bottom: 5px;
+}
+
+.paquete-fichas {
+    font-family: var(--font-numeros);
+    font-size: 1.5rem;
+    color: var(--color-rojo);
+}
+
+.paquete-precio {
+    font-family: var(--font-titulo);
+    font-weight: bold;
+    font-size: 1.1rem;
+    margin-top: 10px;
+}
+
+.nota-pago {
+    font-size: 0.8rem;
+    color: #555;
+    font-style: italic;
+    margin-bottom: 15px;
+}
+
 /* RESPONSIVE */
 @media (max-width: 768px) {
     .container {
@@ -847,10 +915,12 @@ body {
         flex-direction: column;
         align-items: center;
     }
+
     .col-central {
         width: 100%;
         max-width: 500px;
     }
+
     .boleta-digital {
         width: 100%;
         max-width: 500px;
@@ -861,7 +931,7 @@ body {
     body {
         padding: 10px;
     }
-    
+
     .logo-sabes {
         font-size: 1.8rem;
     }
@@ -904,4 +974,3 @@ body {
         height: 100px;
     }
 }
-

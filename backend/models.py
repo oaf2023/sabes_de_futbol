@@ -139,3 +139,62 @@ class FechaActual(db.Model):
             'pais_id': self.pais_id,
             'activo': self.activo
         }
+
+
+class PasarelaPago(db.Model):
+    """
+    Configura qué pasarela de pago usará cada país.
+    Una fila por combinación pais/pasarela. Solo una activa por país.
+    """
+    __tablename__ = 'pasarelas_pago'
+
+    id          = db.Column(db.Integer, primary_key=True)
+    pais_id     = db.Column(db.Integer, db.ForeignKey('paises.id'), nullable=False)
+    nombre      = db.Column(db.String(50), nullable=False)  # mercadopago, stripe, paypal
+    activo      = db.Column(db.Boolean, default=False)
+    # JSON con las credenciales de la pasarela (access_token, public_key, etc.)
+    # En producción estas claves deben venir de variables de entorno, NO de la DB
+    config_json = db.Column(db.Text, nullable=True)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'pais_id': self.pais_id,
+            'nombre': self.nombre,
+            'activo': self.activo
+        }
+
+
+class PagoFichas(db.Model):
+    """
+    Registro de cada intento de compra de fichas.
+    Ciclo de vida: pendiente → aprobado | rechazado | cancelado
+    """
+    __tablename__ = 'pagos_fichas'
+
+    id                  = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    usuario_dni         = db.Column(db.String(20), db.ForeignKey('usuarios.dni'), nullable=False)
+    pasarela            = db.Column(db.String(50), nullable=False)   # mercadopago, stripe, paypal
+    external_id         = db.Column(db.String(200), nullable=True)   # ID en la pasarela (preference_id, payment_id)
+    paquete             = db.Column(db.String(50), nullable=False)    # starter, normal, pro
+    fichas              = db.Column(db.Integer, nullable=False)
+    monto               = db.Column(db.Float, nullable=False)
+    moneda              = db.Column(db.String(10), default='ARS')
+    estado              = db.Column(db.String(20), default='pendiente')  # pendiente, aprobado, rechazado, cancelado
+    fecha_creacion      = db.Column(db.DateTime, default=datetime.utcnow)
+    fecha_resolucion    = db.Column(db.DateTime, nullable=True)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'usuario_dni': self.usuario_dni,
+            'pasarela': self.pasarela,
+            'external_id': self.external_id,
+            'paquete': self.paquete,
+            'fichas': self.fichas,
+            'monto': self.monto,
+            'moneda': self.moneda,
+            'estado': self.estado,
+            'fecha_creacion': self.fecha_creacion.isoformat() if self.fecha_creacion else None,
+            'fecha_resolucion': self.fecha_resolucion.isoformat() if self.fecha_resolucion else None,
+        }

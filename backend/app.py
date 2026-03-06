@@ -15,7 +15,8 @@ import json
 import requests
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
-from models import db, Usuario, Pais, FechaSorteo, Partido, JugadaUsuario, FechaActual
+from models import db, Usuario, Pais, FechaSorteo, Partido, JugadaUsuario, FechaActual, PasarelaPago, PagoFichas
+from datetime import datetime
 from game_logic import (
     codificar_jugada, decodificar_jugada, 
     generar_resultados_aleatorios_bin, calcular_aciertos_bin
@@ -41,6 +42,16 @@ db.init_app(app)
 with app.app_context():
     db.create_all()
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+    # Seed: crear pasarela Mercado Pago para Argentina (pais_id=1) si no existe
+    if not PasarelaPago.query.filter_by(pais_id=1, nombre='mercadopago').first():
+        pasarela_ar = PasarelaPago(
+            pais_id=1,
+            nombre='mercadopago',
+            activo=True,
+            config_json='{}'
+        )
+        db.session.add(pasarela_ar)
+        db.session.commit()
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -347,6 +358,162 @@ def obtener_detalle_jugada(jugada_id):
         'fecha_hora': jugada.fecha_registro.strftime('%d/%m/%Y %H:%M'),
         'partidos': partidos_res
     }), 200
+
+# ============================================================
+# PAQUETES DE FICHAS DISPONIBLES
+# ============================================================
+PAQUETES_FICHAS = {
+    'starter': {'fichas': 5,  'monto': 1000.0, 'label': '5 fichas'},
+    'normal':  {'fichas': 12, 'monto': 2000.0, 'label': '12 fichas'},
+    'pro':     {'fichas': 30, 'monto': 4500.0, 'label': '30 fichas'},
+}
+
+@app.route('/api/iniciar-pago', methods=['POST'])
+def iniciar_pago():
+    """Crea una preferencia de pago en Mercado Pago y devuelve la URL de checkout."""
+    data = request.get_json(silent=True) or {}
+    dni    = data.get('dni', '').strip()
+    paquete = data.get('paquete', 'normal')
+
+    if not dni:
+        return jsonify({'error': 'DNI requerido'}), 400
+
+    paquete_info = PAQUETES_FICHAS.get(paquete)
+    if not paquete_info:
+        return jsonify({'error': 'Paquete inválido'}), 400
+
+    usuario = Usuario.query.get(dni)
+    if not usuario:
+        return jsonify({'error': 'Usuario no encontrado'}), 404
+
+    # Obtener credenciales de Mercado Pago desde variables de entorno
+    access_token = os.environ.get('MP_ACCESS_TOKEN', '')
+    if not access_token:
+        return jsonify({'error': 'Pasarela de pago no configurada. Contactá al administrador.'}), 503
+
+    try:
+        import mercadopago
+        sdk = mercadopago.SDK(access_token)
+
+        app_url = os.environ.get('APP_URL', 'http://127.0.0.1:5000')
+        preference_data = {
+            'items': [{
+                'title': f'Sabes de Fútbol – {paquete_info["label"]}',
+                'quantity': 1,
+                'unit_price': paquete_info['monto'],
+                'currency_id': 'ARS',
+            }],
+            'payer': {'email': usuario.email or f'{dni}@sabedefutbol.com'},
+            'back_urls': {
+                'success': f'{app_url}/?pago=success&dni={dni}',
+                'failure': f'{app_url}/?pago=failure&dni={dni}',
+                'pending': f'{app_url}/?pago=pending&dni={dni}',
+            },
+            'auto_approve': False,
+            'notification_url': f'{app_url}/api/webhook/mercadopago',
+            'metadata': {'dni': dni, 'paquete': paquete},
+            'statement_descriptor': 'SABESFUTBOL',
+        }
+
+        preference_response = sdk.preference().create(preference_data)
+        preference = preference_response['response']
+
+        if 'id' not in preference:
+            return jsonify({'error': 'Error al crear preferencia en Mercado Pago', 'detalle': preference}), 500
+
+        # Registrar el intento de pago como pendiente
+        pago = PagoFichas(
+            usuario_dni=dni,
+            pasarela='mercadopago',
+            external_id=preference['id'],
+            paquete=paquete,
+            fichas=paquete_info['fichas'],
+            monto=paquete_info['monto'],
+            moneda='ARS',
+            estado='pendiente'
+        )
+        db.session.add(pago)
+        db.session.commit()
+
+        # En sandbox usar init_point, en producción usar init_point también
+        checkout_url = preference.get('init_point') or preference.get('sandbox_init_point')
+        return jsonify({
+            'checkout_url': checkout_url,
+            'preference_id': preference['id']
+        }), 200
+
+    except Exception as e:
+        return jsonify({'error': f'Error interno: {str(e)}'}), 500
+
+
+@app.route('/api/webhook/mercadopago', methods=['POST'])
+def webhook_mercadopago():
+    """Recibe notificaciones de Mercado Pago y acredita fichas si el pago fue aprobado."""
+    try:
+        # MP puede enviar datos por query string o por body
+        topic  = request.args.get('topic') or request.args.get('type')
+        mp_id  = request.args.get('id') or request.args.get('data.id')
+
+        if not topic or not mp_id:
+            data = request.get_json(silent=True) or {}
+            topic = data.get('type', '')
+            mp_id = str(data.get('data', {}).get('id', ''))
+
+        if topic not in ('payment', 'merchant_order'):
+            return jsonify({'status': 'ignored'}), 200
+
+        access_token = os.environ.get('MP_ACCESS_TOKEN', '')
+        if not access_token:
+            return jsonify({'error': 'No configurado'}), 503
+
+        import mercadopago
+        sdk = mercadopago.SDK(access_token)
+
+        payment_info = sdk.payment().get(mp_id)
+        payment = payment_info.get('response', {})
+
+        if payment.get('status') != 'approved':
+            return jsonify({'status': 'not_approved'}), 200
+
+        preference_id = payment.get('preference_id')
+        if not preference_id:
+            return jsonify({'status': 'no_preference'}), 200
+
+        # Buscar el pago registrado
+        pago = PagoFichas.query.filter_by(external_id=preference_id, estado='pendiente').first()
+        if not pago:
+            return jsonify({'status': 'already_processed'}), 200
+
+        # Acreditar fichas
+        usuario = Usuario.query.get(pago.usuario_dni)
+        if usuario:
+            usuario.fichas += pago.fichas
+            pago.estado = 'aprobado'
+            pago.fecha_resolucion = datetime.utcnow()
+            db.session.commit()
+
+        return jsonify({'status': 'ok', 'fichas_acreditadas': pago.fichas}), 200
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/pago-estado/<preference_id>', methods=['GET'])
+def pago_estado(preference_id):
+    """Permite al frontend verificar el estado de un pago por su preference_id."""
+    pago = PagoFichas.query.filter_by(external_id=preference_id).first()
+    if not pago:
+        return jsonify({'estado': 'no_encontrado'}), 404
+
+    usuario = Usuario.query.get(pago.usuario_dni)
+    fichas_actuales = usuario.fichas if usuario else 0
+
+    return jsonify({
+        'estado': pago.estado,
+        'fichas_acreditadas': pago.fichas if pago.estado == 'aprobado' else 0,
+        'fichas_actuales': fichas_actuales
+    }), 200
+
 
 # STATIC_DIR: ruta absoluta a la raíz del proyecto (donde están index.html, style.css, etc.)
 # Usa ruta absoluta para que funcione tanto en local como en PythonAnywhere

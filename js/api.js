@@ -98,9 +98,14 @@ async function apiHistorial(dni) {
     return apiCall(`/api/historial/${dni}`, 'GET');
 }
 
-/** Comprar fichas (Simulado) */
-async function apiComprarFichas(dni) {
-    return apiCall('/api/comprar-fichas', 'POST', { dni });
+/** Iniciar proceso de pago real (Mercado Pago) */
+async function apiIniciarPago(dni, paquete) {
+    return apiCall('/api/iniciar-pago', 'POST', { dni, paquete });
+}
+
+/** Verificar estado de un pago por ID de preferencia */
+async function apiGetPagoEstado(preferenceId) {
+    return apiCall(`/api/pago-estado/${preferenceId}`, 'GET');
 }
 
 /** Obtener detalle completo de una jugada específica */

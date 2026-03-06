@@ -215,6 +215,36 @@ Ejemplo de uso: Abrir en cualquier navegador moderno.
     <audio id="audio-derrota" src=""></audio>
 
 
+    <!-- MODAL DE COMPRA DE FICHAS -->
+    <div id="modal-compra-fichas" class="modal-overlay oculto">
+        <div class="compra-fichas-card card-retro">
+            <h3>COMPRAR FICHAS</h3>
+            <p>Elegí un paquete para seguir jugando:</p>
+
+            <div class="paquetes-container">
+                <div class="paquete-item card-retro" onclick="comprarPaquete('starter')">
+                    <span class="paquete-titulo">STARTER</span>
+                    <span class="paquete-fichas">5 FICHAS</span>
+                    <span class="paquete-precio">$1.000</span>
+                </div>
+                <div class="paquete-item card-retro selected" onclick="comprarPaquete('normal')">
+                    <span class="paquete-titulo">NORMAL</span>
+                    <span class="paquete-fichas">12 FICHAS</span>
+                    <span class="paquete-precio">$2.000</span>
+                </div>
+                <div class="paquete-item card-retro" onclick="comprarPaquete('pro')">
+                    <span class="paquete-titulo">PRO</span>
+                    <span class="paquete-fichas">30 FICHAS</span>
+                    <span class="paquete-precio">$4.500</span>
+                </div>
+            </div>
+
+            <p class="nota-pago">Serás redirigido a Mercado Pago para completar la operación.</p>
+
+            <button onclick="cerrarModalCompra()" class="btn-retro-sm">CANCELAR</button>
+        </div>
+    </div>
+
     <!-- MODAL DE HISTORIAL -->
     <div id="modal-historial" class="modal-overlay oculto">
         <div class="historial-card card-retro">
