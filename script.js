@@ -713,11 +713,14 @@ async function comprarPaquete(paquete) {
     const modal = document.getElementById('modal-compra-fichas');
     const content = modal.querySelector('.compra-fichas-card');
     const originalHTML = content.innerHTML;
-    content.innerHTML = `<h3>PROCESANDO...</h3><p>Estamos generando tu orden en Mercado Pago. Un momento...</p>`;
+    content.innerHTML = `<h3>PROCESANDO...</h3><p>Estamos generando tu orden de pago. Un momento...</p>`;
 
     const { ok, data, error } = await apiIniciarPago(usuarioActual.dni, paquete);
     
     if (ok && data.checkout_url) {
+        if (data.modo === 'manual') {
+            alert("⚠️ IMPORTANTE: Estás usando el link de pago estático. El crédito de fichas será realizado MANUALMENTE por el administrador una vez confirmado el pago.");
+        }
         // Redirigir a Mercado Pago
         window.location.href = data.checkout_url;
     } else {

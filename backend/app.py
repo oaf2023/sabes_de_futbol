@@ -48,7 +48,10 @@ with app.app_context():
             pais_id=1,
             nombre='mercadopago',
             activo=True,
-            config_json='{}'
+            config_json=json.dumps({
+                "static_url": "https://link.mercadopago.com.ar/sabesdefutbol",
+                "modo": "manual" # manual o automatico
+            })
         )
         db.session.add(pasarela_ar)
         db.session.commit()
@@ -386,64 +389,81 @@ def iniciar_pago():
     if not usuario:
         return jsonify({'error': 'Usuario no encontrado'}), 404
 
-    # Obtener credenciales de Mercado Pago desde variables de entorno
+    # Obtener configuración de la pasarela desde la DB
+    pasarela = PasarelaPago.query.filter_by(pais_id=usuario.pais_id, nombre='mercadopago', activo=True).first()
+    config = json.loads(pasarela.config_json) if pasarela and pasarela.config_json else {}
+
+    # Prioridad 1: API Automática (si hay token en .env)
     access_token = os.environ.get('MP_ACCESS_TOKEN', '')
-    if not access_token:
-        return jsonify({'error': 'Pasarela de pago no configurada. Contactá al administrador.'}), 503
+    
+    if access_token:
+        try:
+            import mercadopago
+            sdk = mercadopago.SDK(access_token)
 
-    try:
-        import mercadopago
-        sdk = mercadopago.SDK(access_token)
+            app_url = os.environ.get('APP_URL', 'http://127.0.0.1:5000')
+            preference_data = {
+                'items': [{
+                    'title': f'Sabes de Fútbol – {paquete_info["label"]}',
+                    'quantity': 1,
+                    'unit_price': paquete_info['monto'],
+                    'currency_id': 'ARS',
+                }],
+                'payer': {'email': usuario.email or f'{dni}@sabedefutbol.com'},
+                'back_urls': {
+                    'success': f'{app_url}/?pago=success&dni={dni}',
+                    'failure': f'{app_url}/?pago=failure&dni={dni}',
+                    'pending': f'{app_url}/?pago=pending&dni={dni}',
+                },
+                'auto_approve': False,
+                'notification_url': f'{app_url}/api/webhook/mercadopago',
+                'metadata': {'dni': dni, 'paquete': paquete},
+            }
 
-        app_url = os.environ.get('APP_URL', 'http://127.0.0.1:5000')
-        preference_data = {
-            'items': [{
-                'title': f'Sabes de Fútbol – {paquete_info["label"]}',
-                'quantity': 1,
-                'unit_price': paquete_info['monto'],
-                'currency_id': 'ARS',
-            }],
-            'payer': {'email': usuario.email or f'{dni}@sabedefutbol.com'},
-            'back_urls': {
-                'success': f'{app_url}/?pago=success&dni={dni}',
-                'failure': f'{app_url}/?pago=failure&dni={dni}',
-                'pending': f'{app_url}/?pago=pending&dni={dni}',
-            },
-            'auto_approve': False,
-            'notification_url': f'{app_url}/api/webhook/mercadopago',
-            'metadata': {'dni': dni, 'paquete': paquete},
-            'statement_descriptor': 'SABESFUTBOL',
-        }
+            preference_response = sdk.preference().create(preference_data)
+            preference = preference_response['response']
 
-        preference_response = sdk.preference().create(preference_data)
-        preference = preference_response['response']
+            if 'id' in preference:
+                # Registrar el intento de pago
+                pago = PagoFichas(
+                    usuario_dni=dni,
+                    pasarela='mercadopago',
+                    external_id=preference['id'],
+                    paquete=paquete,
+                    fichas=paquete_info['fichas'],
+                    monto=paquete_info['monto'],
+                    estado='pendiente'
+                )
+                db.session.add(pago)
+                db.session.commit()
 
-        if 'id' not in preference:
-            return jsonify({'error': 'Error al crear preferencia en Mercado Pago', 'detalle': preference}), 500
+                checkout_url = preference.get('init_point') or preference.get('sandbox_init_point')
+                return jsonify({'checkout_url': checkout_url, 'modo': 'automático'}), 200
+        except Exception as e:
+            print(f"Error MP API: {e}")
+            # Si falla la API, cae al modo manual si existe URL
 
-        # Registrar el intento de pago como pendiente
-        pago = PagoFichas(
-            usuario_dni=dni,
-            pasarela='mercadopago',
-            external_id=preference['id'],
-            paquete=paquete,
-            fichas=paquete_info['fichas'],
-            monto=paquete_info['monto'],
-            moneda='ARS',
-            estado='pendiente'
-        )
-        db.session.add(pago)
-        db.session.commit()
+    # Prioridad 2: Modo Manual (Link de Pago Estático)
+    static_url = config.get('static_url') or "https://link.mercadopago.com.ar/sabesdefutbol"
+    
+    # Registrar el intento manual (aunque no tenga auto-acreditación)
+    pago_m = PagoFichas(
+        usuario_dni=dni,
+        pasarela='mercadopago_manual',
+        external_id=f'manual_{int(datetime.utcnow().timestamp())}',
+        paquete=paquete,
+        fichas=paquete_info['fichas'],
+        monto=paquete_info['monto'],
+        estado='pendiente'
+    )
+    db.session.add(pago_m)
+    db.session.commit()
 
-        # En sandbox usar init_point, en producción usar init_point también
-        checkout_url = preference.get('init_point') or preference.get('sandbox_init_point')
-        return jsonify({
-            'checkout_url': checkout_url,
-            'preference_id': preference['id']
-        }), 200
-
-    except Exception as e:
-        return jsonify({'error': f'Error interno: {str(e)}'}), 500
+    return jsonify({
+        'checkout_url': static_url,
+        'modo': 'manual',
+        'mensaje': 'Al usar el link estático, el crédito de fichas es manual por el administrador.'
+    }), 200
 
 
 @app.route('/api/webhook/mercadopago', methods=['POST'])
