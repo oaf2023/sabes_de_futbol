@@ -588,7 +588,8 @@ async function mostrarHistorial() {
     const { ok, data } = await apiHistorial(usuarioActual.dni);
     if (!ok) { alert('No se pudo obtener el historial.'); return; }
 
-    const jugadas = data.historial;
+    // El backend devuelve el array directamente
+    const jugadas = Array.isArray(data) ? data : (data.historial || []);
     const container = document.getElementById('historial-ticket-style');
     if (!container) return;
 
