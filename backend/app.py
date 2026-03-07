@@ -15,6 +15,10 @@ import json
 import requests
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
+from dotenv import load_dotenv
+
+# Cargar variables de entorno desde .env si existe
+load_dotenv()
 from models import db, Usuario, Pais, FechaSorteo, Partido, JugadaUsuario, FechaActual, PasarelaPago, PagoFichas
 from datetime import datetime
 from game_logic import (
@@ -394,7 +398,8 @@ def iniciar_pago():
     config = json.loads(pasarela.config_json) if pasarela and pasarela.config_json else {}
 
     # Prioridad 1: API Automática (si hay token en .env)
-    access_token = os.environ.get('MP_ACCESS_TOKEN', '')
+    # Buscamos ambos nombres por compatibilidad
+    access_token = os.environ.get('MERCADOPAGO_ACCESS_TOKEN') or os.environ.get('MP_ACCESS_TOKEN', '')
     
     if access_token:
         try:
