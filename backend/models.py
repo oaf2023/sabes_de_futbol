@@ -33,6 +33,7 @@ class Usuario(db.Model):
     foto_selfie     = db.Column(db.String(300), nullable=True)
     fecha_registro  = db.Column(db.DateTime, default=datetime.utcnow)
     fichas          = db.Column(db.Integer, default=0) # Nuevo: Sistema de fichas
+    pais_id         = db.Column(db.Integer, db.ForeignKey('paises.id'), default=1) # Nuevo: País del usuario (1=Arg)
 
     jugadas = db.relationship('JugadaUsuario', backref='usuario', lazy=True)
 
