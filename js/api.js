@@ -13,7 +13,7 @@ Ejemplo de uso: importado en index.html o referenciado antes de script.js.
 const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 const API_BASE_URL = isLocal
     ? 'http://127.0.0.1:5000'
-    : `https://${window.location.hostname}`;
+    : ''; // En producción usar rutas relativas para evitar líos de dominios
 
 
 /**

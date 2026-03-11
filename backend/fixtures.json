@@ -6,7 +6,7 @@
             "Gimnasia (Mza.) vs Defensa y Justicia",
             "Barracas Central vs Banfield",
             "Platense vs Estudiantes",
-            "Vélez Sársfield vs Newell’s",
+            "Vélez vs Newell's",
             "Unión vs Talleres",
             "Rosario Central vs Tigre",
             "Aldosivi vs Independiente Rivadavia Mza.",
@@ -14,8 +14,262 @@
             "San Lorenzo vs Independiente",
             "Racing vs Huracán",
             "Belgrano vs Sarmiento",
+            "Gimnasia vs Argentinos",
+            "Lanús vs Deportivo Riestra",
             "Central Córdoba vs Boca",
             "River vs Atlético Tucumán"
+        ]
+    },
+    {
+        "nro_fecha": 10,
+        "pais": "Argentina",
+        "partidos": [
+            {
+                "local": "Tigre",
+                "visitante": "Vélez",
+                "fecha_hora": "2026-03-10T19:45:00",
+                "goles_local": 0,
+                "goles_visitante": 0,
+                "resultado": "E"
+            },
+            {
+                "local": "Independiente",
+                "visitante": "Unión",
+                "fecha_hora": "2026-03-10T19:45:00",
+                "goles_local": 4,
+                "goles_visitante": 4,
+                "resultado": "E"
+            },
+            {
+                "local": "Sarmiento",
+                "visitante": "Racing",
+                "fecha_hora": "2026-03-10T22:00:00",
+                "goles_local": 1,
+                "goles_visitante": 2,
+                "resultado": "V"
+            },
+            {
+                "local": "Newell's",
+                "visitante": "Platense",
+                "fecha_hora": "2026-03-10T22:00:00",
+                "goles_local": 1,
+                "goles_visitante": 0,
+                "resultado": "L"
+            },
+            {
+                "local": "Banfield",
+                "visitante": "Gimnasia",
+                "fecha_hora": "2026-03-11T17:30:00",
+                "goles_local": 0,
+                "goles_visitante": 1,
+                "resultado": "V"
+            },
+            {
+                "local": "Argentinos",
+                "visitante": "Rosario Central",
+                "fecha_hora": "2026-03-11T17:30:00",
+                "goles_local": 2,
+                "goles_visitante": 2,
+                "resultado": "E"
+            },
+            {
+                "local": "Boca",
+                "visitante": "San Lorenzo",
+                "fecha_hora": "2026-03-11T19:45:00",
+                "goles_local": null,
+                "goles_visitante": null,
+                "resultado": null
+            },
+            {
+                "local": "Ind. Rivadavia Mza.",
+                "visitante": "Barracas Central",
+                "fecha_hora": "2026-03-11T22:00:00",
+                "goles_local": null,
+                "goles_visitante": null,
+                "resultado": null
+            },
+            {
+                "local": "Atlético Tucumán",
+                "visitante": "Aldosivi",
+                "fecha_hora": "2026-03-11T22:00:00",
+                "goles_local": null,
+                "goles_visitante": null,
+                "resultado": null
+            },
+            {
+                "local": "Riestra",
+                "visitante": "Gimnasia (Mza.)",
+                "fecha_hora": "2026-03-12T17:00:00",
+                "goles_local": null,
+                "goles_visitante": null,
+                "resultado": null
+            },
+            {
+                "local": "Defensa y Justicia",
+                "visitante": "Central Córdoba",
+                "fecha_hora": "2026-03-12T17:00:00",
+                "goles_local": null,
+                "goles_visitante": null,
+                "resultado": null
+            },
+            {
+                "local": "Talleres",
+                "visitante": "Instituto",
+                "fecha_hora": "2026-03-12T19:15:00",
+                "goles_local": null,
+                "goles_visitante": null,
+                "resultado": null
+            },
+            {
+                "local": "Estudiantes (RC)",
+                "visitante": "Belgrano",
+                "fecha_hora": "2026-03-12T19:15:00",
+                "goles_local": null,
+                "goles_visitante": null,
+                "resultado": null
+            },
+            {
+                "local": "Huracán",
+                "visitante": "River",
+                "fecha_hora": "2026-03-12T21:30:00",
+                "goles_local": null,
+                "goles_visitante": null,
+                "resultado": null
+            },
+            {
+                "local": "Estudiantes",
+                "visitante": "Lanús",
+                "fecha_hora": "2026-03-13T20:00:00",
+                "goles_local": null,
+                "goles_visitante": null,
+                "resultado": null
+            }
+        ]
+    },
+    {
+        "nro_fecha": 11,
+        "pais": "Argentina",
+        "partidos": [
+            "Platense vs Vélez",
+            "Rosario Central vs Banfield",
+            "Tigre vs Argentinos",
+            "Gimnasia vs Independiente Rivadavia Mza.",
+            "Belgrano vs Talleres",
+            "River vs Sarmiento",
+            "Unión vs Boca",
+            "Barracas Central vs Atlético Tucumán",
+            "Aldosivi vs Huracán",
+            "San Lorenzo vs Defensa y Justicia",
+            "Racing vs Estudiantes (Río Cuarto)",
+            "Instituto vs Independiente",
+            "Lanús vs Newell's",
+            "Central Córdoba vs Deportivo Riestra",
+            "Gimnasia (Mza.) vs Estudiantes"
+        ]
+    },
+    {
+        "nro_fecha": 12,
+        "pais": "Argentina",
+        "partidos": [
+            "Banfield vs Tigre",
+            "Atlético Tucumán vs Gimnasia",
+            "Vélez vs Lanús",
+            "Newell's vs Gimnasia (Mza.)",
+            "Defensa y Justicia vs Unión",
+            "Independiente vs Talleres",
+            "Belgrano vs Racing",
+            "Sarmiento vs Aldosivi",
+            "Estudiantes (Río Cuarto) vs River",
+            "Boca vs Instituto",
+            "Independiente Rivadavia Mza. vs Rosario Central",
+            "Argentinos vs Platense",
+            "Estudiantes vs Central Córdoba",
+            "Huracán vs Barracas Central",
+            "Deportivo Riestra vs San Lorenzo"
+        ]
+    },
+    {
+        "nro_fecha": 13,
+        "pais": "Argentina",
+        "partidos": [
+            "Independiente vs Racing",
+            "Talleres vs Boca",
+            "Instituto vs Defensa y Justicia",
+            "Unión vs Deportivo Riestra",
+            "San Lorenzo vs Estudiantes",
+            "Central Córdoba vs Newell's",
+            "Gimnasia (Mza.) vs Vélez",
+            "Lanús vs Platense",
+            "River vs Belgrano",
+            "Aldosivi vs Estudiantes (Río Cuarto)",
+            "Barracas Central vs Sarmiento",
+            "Gimnasia vs Huracán",
+            "Rosario Central vs Atlético Tucumán",
+            "Tigre vs Independiente Rivadavia Mza.",
+            "Argentinos vs Banfield"
+        ]
+    },
+    {
+        "nro_fecha": 14,
+        "pais": "Argentina",
+        "partidos": [
+            "Lanús vs Banfield",
+            "Platense vs Gimnasia (Mza.)",
+            "Vélez vs Central Córdoba",
+            "Newell's vs San Lorenzo",
+            "Estudiantes vs Unión",
+            "Deportivo Riestra vs Instituto",
+            "Defensa y Justicia vs Talleres",
+            "Boca vs Independiente",
+            "Independiente Rivadavia Mza. vs Argentinos",
+            "Atlético Tucumán vs Tigre",
+            "Huracán vs Rosario Central",
+            "Sarmiento vs Gimnasia",
+            "Estudiantes (Río Cuarto) vs Barracas Central",
+            "Belgrano vs Aldosivi",
+            "Racing vs River"
+        ]
+    },
+    {
+        "nro_fecha": 15,
+        "pais": "Argentina",
+        "partidos": [
+            "River vs Boca",
+            "Independiente vs Defensa y Justicia",
+            "Talleres vs Deportivo Riestra",
+            "Instituto vs Estudiantes",
+            "Unión vs Newell's",
+            "San Lorenzo vs Vélez",
+            "Central Córdoba vs Platense",
+            "Gimnasia (Mza.) vs Lanús",
+            "Aldosivi vs Racing",
+            "Barracas Central vs Belgrano",
+            "Gimnasia vs Estudiantes (Río Cuarto)",
+            "Rosario Central vs Sarmiento",
+            "Tigre vs Huracán",
+            "Argentinos vs Atlético Tucumán",
+            "Banfield vs Independiente Rivadavia Mza."
+        ]
+    },
+    {
+        "nro_fecha": 16,
+        "pais": "Argentina",
+        "partidos": [
+            "Independiente Rivadavia Mza. vs Gimnasia (Mza.)",
+            "Lanús vs Central Córdoba",
+            "Platense vs San Lorenzo",
+            "Vélez vs Unión",
+            "Newell's vs Instituto",
+            "Estudiantes vs Talleres",
+            "Deportivo Riestra vs Independiente",
+            "Defensa y Justicia vs Boca",
+            "Atlético Tucumán vs Banfield",
+            "Huracán vs Argentinos",
+            "Sarmiento vs Tigre",
+            "Estudiantes (Río Cuarto) vs Rosario Central",
+            "Belgrano vs Gimnasia",
+            "Racing vs Barracas Central",
+            "River vs Aldosivi"
         ]
     }
 ]
