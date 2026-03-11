@@ -34,6 +34,7 @@ class Usuario(db.Model):
     fecha_registro  = db.Column(db.DateTime, default=datetime.utcnow)
     fichas          = db.Column(db.Integer, default=0) # Nuevo: Sistema de fichas
     pais_id         = db.Column(db.Integer, db.ForeignKey('paises.id'), default=1) # Nuevo: País del usuario (1=Arg)
+    completado      = db.Column(db.String(2), default='NO') # Nuevo: 'SI' o 'NO'
 
     jugadas = db.relationship('JugadaUsuario', backref='usuario', lazy=True)
 
@@ -53,6 +54,7 @@ class Usuario(db.Model):
             'fecha_nac': self.fecha_nac,
             'foto_selfie': self.foto_selfie,
             'fichas': self.fichas,
+            'completado': self.completado,
             'fecha_registro': self.fecha_registro.isoformat() if self.fecha_registro else None
         }
 
@@ -91,8 +93,11 @@ class Partido(db.Model):
     fecha_sorteo_id = db.Column(db.Integer, db.ForeignKey('fechas_sorteo.id'), nullable=False)
     equipo_local    = db.Column(db.String(100), nullable=False)
     equipo_visitante = db.Column(db.String(100), nullable=False)
-    resultado_real  = db.Column(db.String(1), nullable=True) # 'L', 'E', 'V'
-    orden           = db.Column(db.Integer, default=0)
+    resultado_real   = db.Column(db.String(1), nullable=True)   # 'L', 'E', 'V'
+    orden            = db.Column(db.Integer, default=0)
+    fecha_hora       = db.Column(db.DateTime, nullable=True)
+    goles_local      = db.Column(db.Integer, nullable=True)
+    goles_visitante  = db.Column(db.Integer, nullable=True)
 
     def to_dict(self):
         return {
@@ -101,6 +106,8 @@ class Partido(db.Model):
             'local': self.equipo_local,
             'visitante': self.equipo_visitante,
             'resultado': self.resultado_real,
+            'goles_local': self.goles_local,
+            'goles_visitante': self.goles_visitante,
             'orden': self.orden
         }
 

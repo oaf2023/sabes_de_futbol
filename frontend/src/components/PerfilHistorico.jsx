@@ -1,45 +1,60 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { fetchWithAuth } from '../utils/fetchWithAuth';
 
-export default function PerfilHistorico() {
+export default function PerfilHistorico({ usuario, onVerTicket }) {
+    const [historial, setHistorial] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        if (usuario?.dni) {
+            fetchHistorial(usuario.dni);
+        }
+    }, [usuario]);
+
+    const fetchHistorial = async (dni) => {
+        try {
+            const resp = await fetchWithAuth(`/api/historial/${dni}`);
+            const data = await resp.json();
+            if (resp.ok) setHistorial(data);
+        } catch (err) {
+            console.error("Error al cargar historial:", err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
-        <section className="card" style={{
-            backgroundColor: 'var(--color-secundario)',
-            border: '2px solid #ccc',
-            display: 'flex',
-            gap: '15px',
-            alignItems: 'center'
-        }}>
-            <div style={{
-                width: '80px',
-                height: '100px',
-                backgroundColor: '#d2b48c',
-                border: '3px solid #fff',
-                boxShadow: '2px 2px 5px rgba(0,0,0,0.2)',
-                backgroundImage: 'radial-gradient(circle at 50% 30%, #5c3c1e 15px, transparent 16px), radial-gradient(ellipse at 50% 100%, #5c3c1e 35px, transparent 36px)',
-                position: 'relative',
-                overflow: 'hidden'
-            }}>
-                <div style={{
-                    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-                    background: 'rgba(139, 69, 19, 0.2)', mixBlendMode: 'multiply'
-                }}></div>
-            </div>
-
-            <div>
-                <h2 style={{
-                    fontFamily: 'var(--font-titulo)', color: 'var(--color-primario)',
-                    fontSize: '1.2rem', marginBottom: '5px', borderBottom: '1px solid var(--color-primario)'
-                }}>MURAL DE LEYENDAS</h2>
-
-                <p style={{ fontSize: '0.85rem', lineHeight: '1.4' }}>
-                    Héroe: <span style={{ fontFamily: 'var(--font-titulo)', fontWeight: 'bold' }}>Ramón Negrete Mercedes</span>
-                </p>
-                <p style={{ fontSize: '0.85rem', lineHeight: '1.4' }}>
-                    Hito: <span style={{ fontFamily: 'var(--font-titulo)', fontWeight: 'bold' }}>1er Ganador (1972)</span>
-                </p>
-                <p style={{ fontSize: '0.85rem', lineHeight: '1.4', marginTop: '5px', color: '#555', fontStyle: 'italic' }}>
-                    <small>✨ Easter Egg: Primer partido histórico fue Estudiantes LP vs Atlanta (2-0) el 27/02/1972.</small>
-                </p>
+        <section className="historial-tickets card-madera" style={{ marginTop: '20px' }}>
+            <h2 className="titulo-pizarron">MIS JUGADAS</h2>
+            <div className="historial-container-inline" id="historial-ticket-style">
+                {loading ? (
+                    <p className="no-jugadas">Cargando jugadas...</p>
+                ) : historial.length === 0 ? (
+                    <p className="no-jugadas">Aún no tenés jugadas. ¡Empezá hoy!</p>
+                ) : (
+                    historial.sort((a, b) => b.id - a.id).map((ticket) => (
+                        <div
+                            key={ticket.id}
+                            className="ticket-historial card-retro"
+                            onClick={() => onVerTicket(ticket.id)}
+                            style={{ cursor: 'pointer' }}
+                        >
+                            <div className="ticket-header-sm">
+                                <span>FECHA #{ticket.nro_fecha || '00000'}</span>
+                                <span className="fecha-sm">{ticket.fecha || ''}</span>
+                            </div>
+                            <div style={{ fontSize: '0.7rem', color: 'var(--color-acento)', marginBottom: '5px' }}>
+                                JUGADA #{String(ticket.id).padStart(5, '0')}
+                            </div>
+                            <div className="ticket-body-sm">
+                                <div className="aciertos-sm">{ticket.aciertos ?? 0} ACIERTOS</div>
+                                <div style={{ fontSize: '0.65rem', color: 'var(--color-primario)', marginTop: '4px' }}>
+                                    Hacé clic para ver detalle
+                                </div>
+                            </div>
+                        </div>
+                    ))
+                )}
             </div>
         </section>
     );
