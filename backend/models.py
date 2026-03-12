@@ -149,6 +149,32 @@ class FechaActual(db.Model):
         }
 
 
+class ResultadoFecha(db.Model):
+    """
+    Tabla de resultados oficiales por fecha y país.
+    Registra la jugada binaria ganadora cuando todos los partidos finalizan.
+    Usada para calcular aciertos globales y estadísticas de la fecha.
+    """
+    __tablename__ = 'resultados'
+
+    id              = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    nro_fecha       = db.Column(db.Integer, nullable=False)
+    jugada_binaria  = db.Column(db.String(500), nullable=False)   # resultado oficial codificado
+    fecha_registro  = db.Column(db.DateTime, default=datetime.utcnow)
+    pais            = db.Column(db.Integer, db.ForeignKey('paises.id'), nullable=False)  # pais_id
+    fecha_revision  = db.Column(db.DateTime, nullable=True)       # cuando se revisó/cerró la fecha
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'nro_fecha': self.nro_fecha,
+            'jugada_binaria': self.jugada_binaria,
+            'fecha_registro': self.fecha_registro.isoformat() if self.fecha_registro else None,
+            'pais': self.pais,
+            'fecha_revision': self.fecha_revision.isoformat() if self.fecha_revision else None,
+        }
+
+
 class PasarelaPago(db.Model):
     """
     Configura qué pasarela de pago usará cada país.

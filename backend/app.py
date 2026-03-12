@@ -15,10 +15,22 @@ from dotenv import load_dotenv
 
 # Cargar configuración
 load_dotenv()
-from models import db, Usuario, PasarelaPago, JugadaUsuario, FechaSorteo
+from models import db, Usuario, PasarelaPago, JugadaUsuario, FechaSorteo, Partido, FechaActual, Pais, PagoFichas, ResultadoFecha
 from services import UserService, GameService, PaymentService, ejecutar_tarea_concurrente
 from game_logic import decodificar_jugada
 from auth import create_jwt_token, require_auth
+
+ADMIN_SECRET = os.getenv('ADMIN_SECRET', '')
+
+def require_admin(f):
+    from functools import wraps
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        secret = request.headers.get('X-Admin-Secret', '')
+        if not ADMIN_SECRET or not hmac.compare_digest(secret, ADMIN_SECRET):
+            return jsonify({'error': 'No autorizado'}), 403
+        return f(*args, **kwargs)
+    return decorated
 
 app = Flask(__name__)
 
@@ -168,12 +180,29 @@ def actualizar_socio():
 # ---------------------------------------------------------------------------
 @app.route('/api/partidos', methods=['GET'])
 def get_partidos():
+    from datetime import datetime as dt
     fecha, error, code = GameService.obtener_partidos_activos()
     if error: return jsonify({'error': error}), code
 
     partidos_lista = sorted(fecha.partidos, key=lambda x: x.orden)
+
+    # Determinar si la fecha ya comenzó: comparar la hora del primer partido con ahora
+    ahora = dt.utcnow()
+    primer_partido_hora = None
+    for p in partidos_lista:
+        if getattr(p, 'fecha_hora', None):
+            primer_partido_hora = p.fecha_hora
+            break
+
+    # La fecha "comenzó" si el primer partido tiene hora y ya pasó
+    fecha_comenzada = bool(primer_partido_hora and ahora >= primer_partido_hora)
+
     return jsonify({
         'nro_fecha': f"{fecha.nro_fecha:05d}",
+        'fecha_id': fecha.id,
+        'fecha_comenzada': fecha_comenzada,
+        'primer_partido_hora': primer_partido_hora.isoformat() if primer_partido_hora else None,
+        'sorteado': all(p.resultado_real is not None for p in fecha.partidos),
         'partidos': [
             {
                 'numero': i + 1,
@@ -187,8 +216,37 @@ def get_partidos():
             }
             for i, p in enumerate(partidos_lista)
         ],
-        'sorteado': all(p.resultado_real is not None for p in fecha.partidos),
-        'fecha_id': fecha.id
+    }), 200
+
+
+@app.route('/api/proxima-fecha', methods=['GET'])
+def get_proxima_fecha():
+    """Devuelve los partidos de la próxima fecha (activa+1) si existe y aún no está activa."""
+    control = FechaActual.query.filter_by(activo=True).first()
+    if not control:
+        return jsonify({'proxima': None}), 200
+
+    nro_proxima = control.nro_fecha + 1
+    fecha = FechaSorteo.query.filter_by(nro_fecha=nro_proxima, pais_id=control.pais_id).first()
+    if not fecha:
+        return jsonify({'proxima': None}), 200
+
+    partidos_lista = sorted(fecha.partidos, key=lambda x: x.orden)
+    return jsonify({
+        'proxima': {
+            'nro_fecha': f"{fecha.nro_fecha:05d}",
+            'fecha_id': fecha.id,
+            'partidos': [
+                {
+                    'numero': i + 1,
+                    'nombre': p.to_dict()['nombre'],
+                    'local': p.equipo_local,
+                    'visitante': p.equipo_visitante,
+                    'fecha_hora': p.fecha_hora.isoformat() if getattr(p, 'fecha_hora', None) else None,
+                }
+                for i, p in enumerate(partidos_lista)
+            ],
+        }
     }), 200
 
 
@@ -276,6 +334,87 @@ def historial(dni):
         })
     return jsonify(res), 200
 
+@app.route('/api/mi-jugada-activa', methods=['GET'])
+@require_auth
+def mi_jugada_activa():
+    """
+    Devuelve la jugada más reciente del usuario en la fecha activa.
+    Incluye cada partido con la selección del usuario, el resultado real (si ya finalizó),
+    y un flag 'acierto' (True/False/None) para renderizar el fibrón verde/naranja.
+    También devuelve estadísticas parciales cuando la fecha está en curso.
+    """
+    dni = request.current_user_dni
+    control = FechaActual.query.filter_by(activo=True).first()
+    if not control:
+        return jsonify({'jugada': None, 'motivo': 'sin_fecha_activa'}), 200
+
+    fecha = FechaSorteo.query.filter_by(
+        nro_fecha=control.nro_fecha,
+        pais_id=control.pais_id
+    ).first()
+    if not fecha:
+        return jsonify({'jugada': None, 'motivo': 'sin_fixture'}), 200
+
+    jugada = (JugadaUsuario.query
+              .filter_by(usuario_dni=dni, fecha_sorteo_id=fecha.id)
+              .order_by(JugadaUsuario.fecha_registro.desc())
+              .first())
+    if not jugada:
+        return jsonify({'jugada': None, 'motivo': 'sin_jugada'}), 200
+
+    partidos = sorted(fecha.partidos, key=lambda x: x.orden)
+    selecciones = decodificar_jugada(jugada.jugada_binaria)
+
+    partidos_res = []
+    aciertos_parciales = 0
+    errores_parciales = 0
+    finalizados = 0
+
+    for i, p in enumerate(partidos):
+        sel = selecciones[i] if i < len(selecciones) else None
+        res = p.resultado_real
+        acierto = None
+        if res is not None:
+            finalizados += 1
+            acierto = (sel == res)
+            if acierto:
+                aciertos_parciales += 1
+            else:
+                errores_parciales += 1
+
+        partidos_res.append({
+            'nombre': f"{p.equipo_local} vs {p.equipo_visitante}",
+            'local': p.equipo_local,
+            'visitante': p.equipo_visitante,
+            'seleccion': sel,
+            'resultado': res,
+            'goles_local': p.goles_local,
+            'goles_visitante': p.goles_visitante,
+            'fecha_hora': p.fecha_hora.isoformat() if getattr(p, 'fecha_hora', None) else None,
+            'acierto': acierto,   # True = verde, False = naranja, None = pendiente
+        })
+
+    total = len(partidos_res)
+    pct_aciertos = round(aciertos_parciales / finalizados * 100) if finalizados > 0 else 0
+    pct_errores  = round(errores_parciales  / finalizados * 100) if finalizados > 0 else 0
+
+    return jsonify({
+        'jugada': {
+            'id': jugada.id,
+            'nro_fecha': f"{fecha.nro_fecha:05d}",
+            'fecha_registro': jugada.fecha_registro.isoformat() if jugada.fecha_registro else None,
+            'aciertos_totales': jugada.aciertos,           # None hasta que cierre la fecha
+            'partidos': partidos_res,
+            'finalizados': finalizados,
+            'total': total,
+            'aciertos_parciales': aciertos_parciales,
+            'errores_parciales': errores_parciales,
+            'pct_aciertos': pct_aciertos,
+            'pct_errores': pct_errores,
+        }
+    }), 200
+
+
 # ---------------------------------------------------------------------------
 # Pagos
 # ---------------------------------------------------------------------------
@@ -295,12 +434,18 @@ def gestionar_fichas(dni):
 @require_auth
 def iniciar_pago():
     data = request.get_json(silent=True) or {}
-    paquete = data.get('paquete')
-    if not paquete:
-        return jsonify({'error': 'Faltan datos'}), 400
+    cantidad = data.get('cantidad')
+    if not cantidad:
+        return jsonify({'error': 'Faltan datos: cantidad requerida'}), 400
+    try:
+        cantidad = int(cantidad)
+    except (TypeError, ValueError):
+        return jsonify({'error': 'cantidad debe ser un número entero'}), 400
+    if cantidad < 1:
+        return jsonify({'error': 'La cantidad mínima es 1 ficha'}), 400
 
     # DNI viene del JWT
-    res, error, code = PaymentService.crear_preferencia_mercadopago(request.current_user_dni, paquete)
+    res, error, code = PaymentService.crear_preferencia_mercadopago(request.current_user_dni, cantidad)
     if error: return jsonify({'error': error}), code
     return jsonify(res), 200
 
@@ -340,6 +485,356 @@ def webhook_mercadopago():
     res, error, code = PaymentService.procesar_webhook_mercadopago(mp_id, topic)
     if error: return jsonify({'error': error}), code
     return jsonify(res), 200
+
+# ---------------------------------------------------------------------------
+# Endpoints Admin
+# ---------------------------------------------------------------------------
+
+@app.route('/api/admin/stats', methods=['GET'])
+@require_admin
+def admin_stats():
+    socios     = db.session.execute(db.text('SELECT COUNT(*) FROM usuarios')).scalar()
+    completos  = db.session.execute(db.text("SELECT COUNT(*) FROM usuarios WHERE completado='SI'")).scalar()
+    jugadas    = db.session.execute(db.text('SELECT COUNT(*) FROM jugadas_usuario')).scalar()
+    fichas_tot = db.session.execute(db.text('SELECT COALESCE(SUM(fichas),0) FROM usuarios')).scalar()
+    pagos_ok   = db.session.execute(db.text("SELECT COUNT(*) FROM pagos_fichas WHERE estado='aprobado'")).scalar()
+    ultimos    = Usuario.query.order_by(Usuario.fecha_registro.desc()).limit(10).all()
+    fechas_act = db.session.execute(db.text(
+        'SELECT fa.nro_fecha, fa.pais_id, fa.activo, p.nombre as pais '
+        'FROM fecha_actual fa LEFT JOIN paises p ON fa.pais_id = p.id'
+    )).fetchall()
+    return jsonify({
+        'socios': socios, 'completos': completos, 'jugadas': jugadas,
+        'fichas_total': fichas_tot, 'pagos_ok': pagos_ok,
+        'ultimos_socios': [u.to_dict() for u in ultimos],
+        'fechas_activas': [dict(r._mapping) for r in fechas_act]
+    }), 200
+
+
+@app.route('/api/admin/paises', methods=['GET'])
+@require_admin
+def admin_paises():
+    paises = Pais.query.order_by(Pais.id).all()
+    return jsonify([{'id': p.id, 'nombre': p.nombre} for p in paises]), 200
+
+
+@app.route('/api/admin/fechas', methods=['GET'])
+@require_admin
+def admin_fechas():
+    pais_id = request.args.get('pais_id', type=int)
+    q = FechaSorteo.query
+    if pais_id:
+        q = q.filter_by(pais_id=pais_id)
+    fechas = q.order_by(FechaSorteo.nro_fecha).all()
+    return jsonify([{'id': f.id, 'nro_fecha': f.nro_fecha, 'pais_id': f.pais_id} for f in fechas]), 200
+
+
+@app.route('/api/admin/fecha-activa', methods=['GET'])
+@require_admin
+def admin_fecha_activa():
+    pais_id = request.args.get('pais_id', type=int)
+    q = FechaActual.query
+    if pais_id:
+        q = q.filter_by(pais_id=pais_id)
+    rows = q.all()
+    return jsonify([r.to_dict() for r in rows]), 200
+
+
+@app.route('/api/admin/activar-fecha', methods=['POST'])
+@require_admin
+def admin_activar_fecha():
+    data    = request.get_json(silent=True) or {}
+    pais_id = data.get('pais_id')
+    nro     = data.get('nro_fecha')
+    if not pais_id or nro is None:
+        return jsonify({'error': 'Faltan pais_id o nro_fecha'}), 400
+    fa = FechaActual.query.filter_by(pais_id=pais_id).first()
+    if fa:
+        fa.nro_fecha = nro
+        fa.activo    = True
+    else:
+        db.session.add(FechaActual(nro_fecha=nro, pais_id=pais_id, activo=True))
+    db.session.commit()
+    return jsonify({'ok': True, 'nro_fecha': nro}), 200
+
+
+@app.route('/api/admin/partidos', methods=['GET'])
+@require_admin
+def admin_partidos():
+    pais_id   = request.args.get('pais_id', type=int, default=1)
+    nro_fecha = request.args.get('nro_fecha', type=int)
+    fs = FechaSorteo.query.filter_by(pais_id=pais_id, nro_fecha=nro_fecha).first() if nro_fecha else None
+    if not fs:
+        return jsonify({'partidos': [], 'fs_id': None}), 200
+    ps = sorted(fs.partidos, key=lambda p: p.orden)
+    return jsonify({
+        'fs_id': fs.id,
+        'partidos': [{
+            'id': p.id, 'orden': p.orden,
+            'local': p.equipo_local, 'visitante': p.equipo_visitante,
+            'goles_local': p.goles_local, 'goles_visitante': p.goles_visitante,
+            'resultado': p.resultado_real,
+            'fecha_hora': p.fecha_hora.isoformat() if p.fecha_hora else None,
+        } for p in ps]
+    }), 200
+
+
+@app.route('/api/admin/resultado', methods=['POST'])
+@require_admin
+def admin_resultado():
+    from datetime import datetime as dt
+    from game_logic import codificar_jugada as _cod
+    data = request.get_json(silent=True) or {}
+    pid  = data.get('partido_id')
+    gl   = data.get('goles_local')
+    gv   = data.get('goles_visitante')
+    res  = data.get('resultado')  # 'L', 'E', 'V' o None
+    if pid is None:
+        return jsonify({'error': 'partido_id requerido'}), 400
+    p = Partido.query.get(pid)
+    if not p:
+        return jsonify({'error': 'Partido no encontrado'}), 404
+    p.goles_local     = gl
+    p.goles_visitante = gv
+    p.resultado_real  = res if res in ('L', 'E', 'V') else None
+    db.session.commit()
+
+    # Si todos los partidos de la fecha finalizaron:
+    fecha = FechaSorteo.query.get(p.fecha_sorteo_id)
+    if fecha and all(pt.resultado_real is not None for pt in fecha.partidos):
+        partidos_ord = sorted(fecha.partidos, key=lambda x: x.orden)
+        resultados_lista = [pt.resultado_real for pt in partidos_ord]
+        binario = _cod(resultados_lista)
+
+        # 1. Registrar resultado oficial en tabla 'resultados' (una sola vez)
+        existe = ResultadoFecha.query.filter_by(
+            nro_fecha=fecha.nro_fecha,
+            pais=fecha.pais_id
+        ).first()
+        if not existe:
+            db.session.add(ResultadoFecha(
+                nro_fecha=fecha.nro_fecha,
+                jugada_binaria=binario,
+                pais=fecha.pais_id,
+                fecha_revision=dt.utcnow()
+            ))
+
+        # 2. Recalcular aciertos para TODAS las jugadas de esta fecha
+        from game_logic import calcular_aciertos_bin as _calc
+        jugadas_fecha = JugadaUsuario.query.filter_by(fecha_sorteo_id=fecha.id).all()
+        for jug in jugadas_fecha:
+            aciertos = _calc(jug.jugada_binaria, binario)
+            jug.aciertos = aciertos
+
+        db.session.commit()
+
+    return jsonify({'ok': True}), 200
+
+
+@app.route('/api/admin/nueva-fecha', methods=['POST'])
+@require_admin
+def admin_nueva_fecha():
+    data     = request.get_json(silent=True) or {}
+    pais_id  = data.get('pais_id')
+    nro      = data.get('nro_fecha')
+    partidos = data.get('partidos', [])  # [{local, visitante, fecha_hora}, ...]
+    if not pais_id or not nro:
+        return jsonify({'error': 'Faltan pais_id o nro_fecha'}), 400
+    if FechaSorteo.query.filter_by(pais_id=pais_id, nro_fecha=nro).first():
+        return jsonify({'error': f'Ya existe la fecha #{nro} para este país'}), 409
+    fs = FechaSorteo(nro_fecha=nro, pais_id=pais_id)
+    db.session.add(fs)
+    db.session.flush()
+    from datetime import datetime as dt
+    for idx, p in enumerate(partidos):
+        fh = None
+        if p.get('fecha_hora'):
+            try:
+                fh = dt.fromisoformat(p['fecha_hora'])
+            except ValueError:
+                pass
+        db.session.add(Partido(
+            fecha_sorteo_id=fs.id, orden=idx+1,
+            equipo_local=p.get('local','').strip(),
+            equipo_visitante=p.get('visitante','').strip(),
+            fecha_hora=fh
+        ))
+    db.session.commit()
+    return jsonify({'ok': True, 'fs_id': fs.id}), 201
+
+
+@app.route('/api/admin/socios', methods=['GET'])
+@require_admin
+def admin_socios():
+    filtro = request.args.get('q', '').strip()
+    q = Usuario.query
+    if filtro:
+        q = q.filter(
+            db.or_(Usuario.dni.like(f'%{filtro}%'), Usuario.nombre.like(f'%{filtro}%'))
+        )
+    socios = q.order_by(Usuario.fecha_registro.desc()).limit(200).all()
+    return jsonify([u.to_dict() for u in socios]), 200
+
+
+@app.route('/api/admin/socio/<dni>', methods=['GET'])
+@require_admin
+def admin_get_socio(dni):
+    u = Usuario.query.get(dni)
+    if not u:
+        return jsonify({'error': 'No encontrado'}), 404
+    return jsonify(u.to_dict()), 200
+
+
+@app.route('/api/admin/socio/<dni>', methods=['POST'])
+@require_admin
+def admin_update_socio(dni):
+    u = Usuario.query.get(dni)
+    if not u:
+        return jsonify({'error': 'No encontrado'}), 404
+    data = request.get_json(silent=True) or {}
+    if 'nombre'    in data: u.nombre    = data['nombre']
+    if 'email'     in data: u.email     = data['email']
+    if 'telefono'  in data: u.telefono  = data['telefono']
+    if 'fichas'    in data: u.fichas    = int(data['fichas'])
+    if 'completado' in data: u.completado = data['completado']
+    if data.get('nueva_password'):
+        u.set_password(data['nueva_password'])
+    db.session.commit()
+    return jsonify({'ok': True}), 200
+
+
+@app.route('/api/admin/migrar-pagos-fichas', methods=['POST'])
+@require_admin
+def admin_migrar_pagos_fichas():
+    """Migración puntual: recrea tabla pagos_fichas con esquema correcto del ORM."""
+    import sqlite3 as _sqlite3
+    try:
+        con = _sqlite3.connect(DB_PATH)
+        cur = con.cursor()
+        cur.execute("PRAGMA table_info(pagos_fichas)")
+        cols = [r[1] for r in cur.fetchall()]
+
+        if cols == ['id','usuario_dni','pasarela','external_id','paquete','fichas','monto','moneda','estado','fecha_creacion','fecha_resolucion']:
+            con.close()
+            return jsonify({'ok': True, 'msg': 'tabla ya tiene esquema correcto', 'columnas': cols}), 200
+
+        cur.execute("SELECT COUNT(*) FROM pagos_fichas")
+        total = cur.fetchone()[0]
+
+        con.execute("PRAGMA foreign_keys = OFF")
+        con.execute("DROP TABLE pagos_fichas")
+        con.execute("""
+            CREATE TABLE pagos_fichas (
+                id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                usuario_dni VARCHAR(20) NOT NULL,
+                pasarela VARCHAR(50) NOT NULL,
+                external_id VARCHAR(200),
+                paquete VARCHAR(50) NOT NULL,
+                fichas INTEGER NOT NULL,
+                monto FLOAT NOT NULL,
+                moneda VARCHAR(10) DEFAULT 'ARS',
+                estado VARCHAR(20) DEFAULT 'pendiente',
+                fecha_creacion DATETIME,
+                fecha_resolucion DATETIME,
+                FOREIGN KEY(usuario_dni) REFERENCES usuarios(dni)
+            )
+        """)
+        con.commit()
+
+        cur.execute("PRAGMA table_info(pagos_fichas)")
+        cols_nuevas = [r[1] for r in cur.fetchall()]
+        con.close()
+        return jsonify({'ok': True, 'msg': f'tabla recreada (habia {total} registros)', 'columnas': cols_nuevas}), 200
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+@app.route('/api/admin/acreditar-fichas', methods=['POST'])
+@require_admin
+def admin_acreditar_fichas():
+    data   = request.get_json(silent=True) or {}
+    dni    = data.get('dni')
+    cant   = data.get('cantidad', 0)
+    motivo = data.get('motivo', 'admin_manual')
+    if not dni or cant <= 0:
+        return jsonify({'error': 'dni y cantidad requeridos'}), 400
+    u = Usuario.query.get(dni)
+    if not u:
+        return jsonify({'error': 'Socio no encontrado'}), 404
+    u.fichas += cant
+    db.session.add(PagoFichas(
+        usuario_dni=dni, pasarela='admin_manual',
+        paquete=f'manual_{motivo}', fichas=cant, monto=0,
+        estado='aprobado', fecha_resolucion=db.func.now()
+    ))
+    db.session.commit()
+    return jsonify({'ok': True, 'fichas_nuevas': u.fichas}), 200
+
+
+@app.route('/api/admin/pagos', methods=['GET'])
+@require_admin
+def admin_pagos():
+    estado = request.args.get('estado', 'todos')
+    q = PagoFichas.query
+    if estado != 'todos':
+        q = q.filter_by(estado=estado)
+    pagos = q.order_by(PagoFichas.fecha_creacion.desc()).limit(100).all()
+    result = []
+    for p in pagos:
+        d = p.to_dict()
+        u = Usuario.query.get(p.usuario_dni)
+        d['nombre'] = u.nombre if u else None
+        result.append(d)
+    return jsonify(result), 200
+
+
+@app.route('/api/admin/pago/<int:pago_id>/aprobar', methods=['POST'])
+@require_admin
+def admin_aprobar_pago(pago_id):
+    p = PagoFichas.query.get(pago_id)
+    if not p:
+        return jsonify({'error': 'No encontrado'}), 404
+    p.estado = 'aprobado'
+    p.fecha_resolucion = db.func.now()
+    u = Usuario.query.get(p.usuario_dni)
+    if u:
+        u.fichas += p.fichas
+    db.session.commit()
+    return jsonify({'ok': True}), 200
+
+
+@app.route('/api/admin/pago/<int:pago_id>/rechazar', methods=['POST'])
+@require_admin
+def admin_rechazar_pago(pago_id):
+    p = PagoFichas.query.get(pago_id)
+    if not p:
+        return jsonify({'error': 'No encontrado'}), 404
+    p.estado = 'rechazado'
+    p.fecha_resolucion = db.func.now()
+    db.session.commit()
+    return jsonify({'ok': True}), 200
+
+
+@app.route('/api/admin/jugadas', methods=['GET'])
+@require_admin
+def admin_jugadas():
+    rows = db.session.execute(db.text(
+        'SELECT ju.id, ju.usuario_dni, u.nombre, ju.nro_fecha, ju.aciertos, ju.fecha_registro '
+        'FROM jugadas_usuario ju LEFT JOIN usuarios u ON ju.usuario_dni=u.dni '
+        'ORDER BY ju.fecha_registro DESC LIMIT 50'
+    )).fetchall()
+    return jsonify([dict(r._mapping) for r in rows]), 200
+
+
+@app.route('/api/admin/partido/<int:partido_id>', methods=['DELETE'])
+@require_admin
+def admin_delete_partido(partido_id):
+    p = Partido.query.get(partido_id)
+    if not p:
+        return jsonify({'error': 'Partido no encontrado'}), 404
+    db.session.delete(p)
+    db.session.commit()
+    return jsonify({'ok': True}), 200
 
 # ---------------------------------------------------------------------------
 # Frontend Servido

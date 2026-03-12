@@ -12,7 +12,7 @@ import json
 import requests
 import mercadopago
 from datetime import datetime
-from models import db, Usuario, FechaSorteo, Partido, JugadaUsuario, FechaActual, PagoFichas, PasarelaPago
+from models import db, Usuario, FechaSorteo, Partido, JugadaUsuario, FechaActual, PagoFichas, PasarelaPago, ResultadoFecha
 from game_logic import (
     codificar_jugada, decodificar_jugada, 
     generar_resultados_aleatorios_bin, calcular_aciertos_bin
@@ -144,15 +144,37 @@ class GameService:
 
         control = FechaActual.query.filter_by(activo=True).first()
         fecha_activa = FechaSorteo.query.filter_by(nro_fecha=control.nro_fecha, pais_id=control.pais_id).first() if control else None
-        
+
         if not fecha_activa:
             return None, "No hay una fecha activa válida", 404
+
+        # Regla 1: No se puede jugar si la fecha ya comenzó
+        # El límite es hasta las 23:59 del día anterior al primer partido
+        ahora = datetime.utcnow()
+        partidos_ordenados = sorted(fecha_activa.partidos, key=lambda x: x.orden)
+        primer_partido_hora = next(
+            (p.fecha_hora for p in partidos_ordenados if getattr(p, 'fecha_hora', None)),
+            None
+        )
+        if primer_partido_hora and ahora >= primer_partido_hora:
+            return None, "La fecha ya comenzó. No se pueden registrar nuevas jugadas.", 403
+
+        # Regla 3: No se puede jugar una fecha anterior a la activa
+        # (el frontend sólo muestra la activa, pero validamos en backend igualmente)
+
+        # Regla: El usuario no puede tener más de una jugada en la misma fecha
+        ya_jugada = JugadaUsuario.query.filter_by(
+            usuario_dni=dni,
+            fecha_sorteo_id=fecha_activa.id
+        ).first()
+        if ya_jugada:
+            return None, "Ya jugaste esta fecha. No podés modificar una jugada guardada.", 409
 
         ids_creados = []
         for selecciones in jugadas_raw:
             if len(selecciones) != len(fecha_activa.partidos):
                 continue
-            
+
             binario = codificar_jugada(selecciones)
             nueva = JugadaUsuario(
                 usuario_dni=dni,
@@ -166,7 +188,7 @@ class GameService:
             ids_creados.append(nueva.id)
 
         if not ids_creados:
-            return None, "Ninguna jugada fue válida", 400
+            return None, "Ninguna jugada fue válida (verificá que todos los partidos estén marcados)", 400
 
         usuario.fichas -= len(ids_creados)
         db.session.commit()
@@ -174,21 +196,21 @@ class GameService:
 
     @staticmethod
     def procesar_sorteo(jugada_id):
-        """Lógica interna del sorteo, apta para concurrencia."""
+        """
+        Calcula aciertos SOLO cuando todos los partidos de la fecha tienen resultado_real
+        cargado por el administrador. No genera resultados aleatorios.
+        """
         jugada = JugadaUsuario.query.get(jugada_id)
         if not jugada: return
-        
+
         fecha = FechaSorteo.query.get(jugada.fecha_sorteo_id)
         partidos = sorted(fecha.partidos, key=lambda x: x.orden)
-        
-        # Generar resultados si no existen
-        for p in partidos:
-            if not p.resultado_real:
-                p.resultado_real = decodificar_jugada(generar_resultados_aleatorios_bin(1))[0]
-        
-        db.session.commit()
 
-        # Calcular aciertos
+        # Solo procesar si TODOS los partidos tienen resultado oficial
+        if not all(p.resultado_real for p in partidos):
+            return  # La fecha aún no terminó, no calculamos nada
+
+        # Calcular aciertos comparando selección del usuario con resultados reales
         resultados_lista = [p.resultado_real for p in partidos]
         resultado_bin = codificar_jugada(resultados_lista)
         aciertos = calcular_aciertos_bin(jugada.jugada_binaria, resultado_bin)
@@ -208,21 +230,15 @@ class GameService:
                 }, timeout=5)
             except: pass
 
-PAQUETES_FICHAS = {
-    'starter': {'fichas': 5,  'monto': 1000.0, 'label': '5 fichas'},
-    'normal':  {'fichas': 12, 'monto': 2000.0, 'label': '12 fichas'},
-    'pro':     {'fichas': 30, 'monto': 4500.0, 'label': '30 fichas'},
-}
-
 class PaymentService:
     @staticmethod
-    def registrar_intento_pago(dni, paquete, p_fichas, p_monto, pasarela_nombre, external_id):
+    def registrar_intento_pago(dni, cantidad_fichas, p_monto, pasarela_nombre, external_id):
         pago = PagoFichas(
             usuario_dni=dni,
             pasarela=pasarela_nombre,
             external_id=external_id,
-            paquete=paquete,
-            fichas=p_fichas,
+            paquete=f'libre_{cantidad_fichas}',
+            fichas=cantidad_fichas,
             monto=p_monto,
             estado='pendiente'
         )
@@ -231,21 +247,23 @@ class PaymentService:
         return pago
 
     @staticmethod
-    def crear_preferencia_mercadopago(dni, paquete):
+    def crear_preferencia_mercadopago(dni, cantidad_fichas):
         usuario = Usuario.query.get(dni)
         if not usuario:
             return None, "Usuario no encontrado", 404
 
-        paquete_info = PAQUETES_FICHAS.get(paquete)
-        if not paquete_info:
-            return None, "Paquete inválido", 400
+        if not isinstance(cantidad_fichas, int) or cantidad_fichas < 1:
+            return None, "Cantidad inválida", 400
+
+        monto = float(cantidad_fichas)  # 1 ficha = $1 ARS
+        label = f'{cantidad_fichas} fichas'
 
         access_token = os.environ.get('MERCADOPAGO_ACCESS_TOKEN') or os.environ.get('MP_ACCESS_TOKEN')
         if not access_token:
             # Fallback manual si no hay token
             static_url = "https://link.mercadopago.com.ar/sabesdefutbol"
-            pago = PaymentService.registrar_intento_pago(
-                dni, paquete, paquete_info['fichas'], paquete_info['monto'], 
+            PaymentService.registrar_intento_pago(
+                dni, cantidad_fichas, monto,
                 'mercadopago_manual', f'manual_{int(datetime.utcnow().timestamp())}'
             )
             return {'checkout_url': static_url, 'modo': 'manual'}, None, 200
@@ -253,12 +271,12 @@ class PaymentService:
         try:
             sdk = mercadopago.SDK(access_token)
             app_url = os.environ.get('APP_URL', 'http://127.0.0.1:5000')
-            
+
             preference_data = {
                 'items': [{
-                    'title': f'Sabes de Fútbol – {paquete_info["label"]}',
+                    'title': f'Sabes de Fútbol – {label}',
                     'quantity': 1,
-                    'unit_price': paquete_info['monto'],
+                    'unit_price': monto,
                     'currency_id': 'ARS',
                 }],
                 'payer': {'email': usuario.email or f'{dni}@sabedefutbol.com'},
@@ -269,7 +287,7 @@ class PaymentService:
                 },
                 'auto_approve': False,
                 'notification_url': f'{app_url}/api/webhook/mercadopago',
-                'metadata': {'dni': dni, 'paquete': paquete},
+                'metadata': {'dni': dni, 'cantidad_fichas': cantidad_fichas},
             }
 
             preference_response = sdk.preference().create(preference_data)
@@ -277,12 +295,12 @@ class PaymentService:
 
             if 'id' in preference:
                 PaymentService.registrar_intento_pago(
-                    dni, paquete, paquete_info['fichas'], paquete_info['monto'],
+                    dni, cantidad_fichas, monto,
                     'mercadopago', preference['id']
                 )
                 checkout_url = preference.get('init_point') or preference.get('sandbox_init_point')
                 return {'checkout_url': checkout_url, 'modo': 'automático'}, None, 200
-            
+
             return None, "Error al crear preferencia", 500
         except Exception as e:
             print(f"Error MP API: {e}")

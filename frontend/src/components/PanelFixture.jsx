@@ -98,20 +98,12 @@ function FilaPartido({ p }) {
 
     return (
         <div className={`fx2-fila fx2-fila--${estado}`}>
-            {/* indicador lateral de estado */}
-            <div className={`fx2-estado-dot fx2-dot--${estado}`} title={
-                estado === 'fin' ? 'Finalizado' : estado === 'live' ? 'En juego' : 'Pendiente'
-            } />
-
-            <span className="fx2-equipo fx2-equipo--local" title={p.local}>
-                {p.local}
-            </span>
-
-            {marcador}
-
-            <span className="fx2-equipo fx2-equipo--visita" title={p.visitante}>
-                {p.visitante}
-            </span>
+            <div className={`fx2-estado-dot fx2-dot--${estado}`} />
+            <div className="fx2-partido-wrap">
+                <span className="fx2-equipo fx2-equipo--local">{p.local}</span>
+                {marcador}
+                <span className="fx2-equipo fx2-equipo--visita">{p.visitante}</span>
+            </div>
         </div>
     );
 }
@@ -158,6 +150,14 @@ export default function PanelFixture({ nroFecha }) {
     const porcentaje = total > 0 ? Math.round((finalizados / total) * 100) : 0;
     const grupos = agruparPorDia(partidos);
 
+    // Rango de días calendario que abarca esta fecha
+    const diasConPartidos = [...new Set(
+        partidos.map(p => p.fecha_hora ? claveDia(parseFechaHora(p.fecha_hora)) : null).filter(Boolean)
+    )];
+    const rangoFecha = diasConPartidos.length > 1
+        ? `${diasConPartidos[0]} → ${diasConPartidos[diasConPartidos.length - 1]}`
+        : diasConPartidos[0] || '';
+
     return (
         <aside className="fx2-panel">
 
@@ -174,6 +174,7 @@ export default function PanelFixture({ nroFecha }) {
                     <div className="fx2-fecha-badge">
                         <span className="fx2-fecha-lbl">FEC</span>
                         <span className="fx2-fecha-num">{String(nroFecha || 0).padStart(2, '0')}</span>
+                        {rangoFecha && <span className="fx2-fecha-rango">{rangoFecha}</span>}
                     </div>
                 </div>
 
