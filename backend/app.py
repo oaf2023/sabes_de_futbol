@@ -430,6 +430,21 @@ def gestionar_fichas(dni):
     return jsonify({'fichas': u.fichas}), 200
 
 
+@app.route('/api/usuario/estado-ultimo-pago', methods=['GET'])
+@require_auth
+def estado_ultimo_pago():
+    pago = PagoFichas.query.filter_by(
+        usuario_dni=request.current_user_dni
+    ).order_by(PagoFichas.fecha_creacion.desc()).first()
+    if not pago:
+        return jsonify({'estado': None}), 200
+    return jsonify({
+        'estado': pago.estado,
+        'fichas': pago.fichas,
+        'fecha': pago.fecha_creacion.isoformat() if pago.fecha_creacion else None
+    }), 200
+
+
 @app.route('/api/iniciar-pago', methods=['POST'])
 @require_auth
 def iniciar_pago():

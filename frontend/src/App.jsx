@@ -30,8 +30,41 @@ function App() {
   const [showModalCompra, setShowModalCompra] = useState(false);
   const [showModalCuenta, setShowModalCuenta] = useState(false);
   const [ticketADetalle, setTicketADetalle] = useState(null);
+  const [mensajePago, setMensajePago] = useState(null);
 
-  useEffect(() => {}, []);
+  // Detectar retorno desde MercadoPago (?pago=success|failure|pending)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const estadoPago = params.get('pago');
+    if (!estadoPago) return;
+    window.history.replaceState({}, '', '/');
+    if (estadoPago === 'success') {
+      setMensajePago({ tipo: 'success', texto: '¡Pago aprobado! Tus fichas fueron acreditadas.' });
+      // Polling: el webhook puede tardar unos segundos en acreditar
+      let intentos = 0;
+      const poll = setInterval(async () => {
+        intentos++;
+        try {
+          const resp = await fetchWithAuth('/api/usuario/estado-ultimo-pago');
+          const data = await resp.json();
+          if (data.estado === 'aprobado' || intentos >= 4) {
+            clearInterval(poll);
+            // Refrescar fichas del usuario
+            const u = JSON.parse(sessionStorage.getItem('sabes_usuario') || '{}');
+            if (u.dni) {
+              const r2 = await fetchWithAuth(`/api/usuario/${u.dni}/fichas`);
+              const d2 = await r2.json();
+              if (r2.ok) setUsuario(prev => prev ? { ...prev, fichas: d2.fichas } : prev);
+            }
+          }
+        } catch { clearInterval(poll); }
+      }, 2000);
+    } else if (estadoPago === 'pending') {
+      setMensajePago({ tipo: 'pending', texto: 'Pago pendiente de confirmación. Las fichas se acreditarán cuando se apruebe.' });
+    } else if (estadoPago === 'failure') {
+      setMensajePago({ tipo: 'failure', texto: 'El pago no pudo completarse. Podés intentarlo de nuevo.' });
+    }
+  }, []);
 
   useEffect(() => {
     if (usuario) {
@@ -238,6 +271,12 @@ function App() {
 
   return (
     <main className="container">
+      {mensajePago && (
+        <div className={`banner-pago banner-pago--${mensajePago.tipo}`}>
+          <span>{mensajePago.texto}</span>
+          <button className="banner-pago-cerrar" onClick={() => setMensajePago(null)}>✕</button>
+        </div>
+      )}
       {/* Columna izquierda: boleta para jugar (si no comenzó) o boleta en curso + próxima fecha */}
       <div className="col-izquierda">
         {fechaComenzada && jugadaActiva ? (
