@@ -7,7 +7,13 @@
 import os
 import hmac
 import hashlib
+from datetime import datetime as _dt, timezone as _tz, timedelta as _td
 from flask import Flask, request, jsonify, send_from_directory
+
+# Argentina UTC-3 fijo
+_AR_TZ = _tz(_td(hours=-3))
+def ahora_ar():
+    return _dt.now(_AR_TZ).replace(tzinfo=None)
 from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -186,16 +192,21 @@ def get_partidos():
 
     partidos_lista = sorted(fecha.partidos, key=lambda x: x.orden)
 
-    # Determinar si la fecha ya comenzó: comparar la hora del primer partido con ahora
-    ahora = dt.utcnow()
+    # Determinar si la fecha ya comenzó: comparar la hora del primer partido con ahora (Argentina)
+    ahora = ahora_ar()
     primer_partido_hora = None
     for p in partidos_lista:
         if getattr(p, 'fecha_hora', None):
             primer_partido_hora = p.fecha_hora
             break
 
-    # La fecha "comenzó" si el primer partido tiene hora y ya pasó
-    fecha_comenzada = bool(primer_partido_hora and ahora >= primer_partido_hora)
+    # La fecha "comenzó" si el primer partido tiene hora y ya pasó.
+    # Si ningún partido tiene fecha_hora configurada, se asume que ya comenzó
+    # (la fecha está activa y sin horario = se juega/jugó sin restricción horaria).
+    if primer_partido_hora:
+        fecha_comenzada = ahora >= primer_partido_hora
+    else:
+        fecha_comenzada = True
 
     return jsonify({
         'nro_fecha': f"{fecha.nro_fecha:05d}",
@@ -257,9 +268,10 @@ def guardar_jugada():
     jugadas = data.get('jugadas', [])
     if not jugadas and 'selecciones' in data:
         jugadas = [data['selecciones']]
+    fecha_sorteo_id = data.get('fecha_sorteo_id')  # opcional, para próxima fecha
 
     # DNI viene del JWT
-    res, error, code = GameService.guardar_jugadas(request.current_user_dni, jugadas)
+    res, error, code = GameService.guardar_jugadas(request.current_user_dni, jugadas, fecha_sorteo_id)
     if error: return jsonify({'error': error}), code
     return jsonify(res), 201
 
@@ -445,6 +457,19 @@ def estado_ultimo_pago():
     }), 200
 
 
+@app.route('/api/usuario/pago/<int:pago_id>', methods=['GET'])
+@require_auth
+def estado_pago_por_id(pago_id):
+    pago = PagoFichas.query.get(pago_id)
+    if not pago or pago.usuario_dni != request.current_user_dni:
+        return jsonify({'estado': None}), 404
+    return jsonify({
+        'estado': pago.estado,
+        'fichas': pago.fichas,
+        'fecha': pago.fecha_creacion.isoformat() if pago.fecha_creacion else None
+    }), 200
+
+
 @app.route('/api/iniciar-pago', methods=['POST'])
 @require_auth
 def iniciar_pago():
@@ -462,6 +487,12 @@ def iniciar_pago():
     # DNI viene del JWT
     res, error, code = PaymentService.crear_preferencia_mercadopago(request.current_user_dni, cantidad)
     if error: return jsonify({'error': error}), code
+    # Devolver también el id del registro de pago para que el frontend haga polling preciso
+    pago = PagoFichas.query.filter_by(
+        usuario_dni=request.current_user_dni
+    ).order_by(PagoFichas.fecha_creacion.desc()).first()
+    if pago:
+        res['pago_id'] = pago.id
     return jsonify(res), 200
 
 
@@ -631,7 +662,7 @@ def admin_resultado():
                 nro_fecha=fecha.nro_fecha,
                 jugada_binaria=binario,
                 pais=fecha.pais_id,
-                fecha_revision=dt.utcnow()
+                fecha_revision=ahora_ar()
             ))
 
         # 2. Recalcular aciertos para TODAS las jugadas de esta fecha

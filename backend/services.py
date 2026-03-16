@@ -11,7 +11,14 @@ import threading
 import json
 import requests
 import mercadopago
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
+
+# Argentina es UTC-3 fijo (sin horario de verano)
+AR_TZ = timezone(timedelta(hours=-3))
+
+def ahora_ar():
+    """Retorna la hora actual en Argentina (UTC-3)."""
+    return datetime.now(AR_TZ).replace(tzinfo=None)
 from models import db, Usuario, FechaSorteo, Partido, JugadaUsuario, FechaActual, PagoFichas, PasarelaPago, ResultadoFecha
 from game_logic import (
     codificar_jugada, decodificar_jugada, 
@@ -133,7 +140,7 @@ class GameService:
         return fecha_activa, None, 200
 
     @staticmethod
-    def guardar_jugadas(dni, jugadas_raw):
+    def guardar_jugadas(dni, jugadas_raw, fecha_sorteo_id=None):
         usuario = Usuario.query.get(dni)
         if not usuario:
             return None, "Usuario no encontrado", 404
@@ -142,25 +149,36 @@ class GameService:
         if usuario.fichas < costo_total:
             return None, f"Fichas insuficientes ({usuario.fichas}/{costo_total})", 402
 
-        control = FechaActual.query.filter_by(activo=True).first()
-        fecha_activa = FechaSorteo.query.filter_by(nro_fecha=control.nro_fecha, pais_id=control.pais_id).first() if control else None
+        # Si viene fecha_sorteo_id explícito (jugada de próxima fecha), usarlo directamente
+        if fecha_sorteo_id:
+            fecha_activa = FechaSorteo.query.get(fecha_sorteo_id)
+            if not fecha_activa:
+                return None, "Fecha no encontrada", 404
+            # Solo validar que no haya comenzado si tiene partidos con hora
+            ahora = ahora_ar()
+            partidos_ordenados = sorted(fecha_activa.partidos, key=lambda x: x.orden)
+            primer_partido_hora = next(
+                (p.fecha_hora for p in partidos_ordenados if getattr(p, 'fecha_hora', None)),
+                None
+            )
+            if primer_partido_hora and ahora >= primer_partido_hora:
+                return None, "Esa fecha ya comenzó. No se pueden registrar nuevas jugadas.", 403
+        else:
+            control = FechaActual.query.filter_by(activo=True).first()
+            fecha_activa = FechaSorteo.query.filter_by(nro_fecha=control.nro_fecha, pais_id=control.pais_id).first() if control else None
 
-        if not fecha_activa:
-            return None, "No hay una fecha activa válida", 404
+            if not fecha_activa:
+                return None, "No hay una fecha activa válida", 404
 
-        # Regla 1: No se puede jugar si la fecha ya comenzó
-        # El límite es hasta las 23:59 del día anterior al primer partido
-        ahora = datetime.utcnow()
-        partidos_ordenados = sorted(fecha_activa.partidos, key=lambda x: x.orden)
-        primer_partido_hora = next(
-            (p.fecha_hora for p in partidos_ordenados if getattr(p, 'fecha_hora', None)),
-            None
-        )
-        if primer_partido_hora and ahora >= primer_partido_hora:
-            return None, "La fecha ya comenzó. No se pueden registrar nuevas jugadas.", 403
-
-        # Regla 3: No se puede jugar una fecha anterior a la activa
-        # (el frontend sólo muestra la activa, pero validamos en backend igualmente)
+            # Bloquear si la fecha activa ya comenzó
+            ahora = ahora_ar()
+            partidos_ordenados = sorted(fecha_activa.partidos, key=lambda x: x.orden)
+            primer_partido_hora = next(
+                (p.fecha_hora for p in partidos_ordenados if getattr(p, 'fecha_hora', None)),
+                None
+            )
+            if primer_partido_hora and ahora >= primer_partido_hora:
+                return None, "La fecha ya comenzó. No se pueden registrar nuevas jugadas.", 403
 
         # Regla: El usuario no puede tener más de una jugada en la misma fecha
         ya_jugada = JugadaUsuario.query.filter_by(
@@ -264,7 +282,7 @@ class PaymentService:
             static_url = "https://link.mercadopago.com.ar/sabesdefutbol"
             PaymentService.registrar_intento_pago(
                 dni, cantidad_fichas, monto,
-                'mercadopago_manual', f'manual_{int(datetime.utcnow().timestamp())}'
+                'mercadopago_manual', f'manual_{int(ahora_ar().timestamp())}'
             )
             return {'checkout_url': static_url, 'modo': 'manual'}, None, 200
 
@@ -335,7 +353,7 @@ class PaymentService:
             if usuario:
                 usuario.fichas += pago.fichas
                 pago.estado = 'aprobado'
-                pago.fecha_resolucion = datetime.utcnow()
+                pago.fecha_resolucion = ahora_ar()
                 db.session.commit()
                 return {'status': 'ok', 'fichas_acreditadas': pago.fichas}, None, 200
 

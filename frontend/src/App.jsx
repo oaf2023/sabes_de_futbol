@@ -31,6 +31,12 @@ function App() {
   const [showModalCuenta, setShowModalCuenta] = useState(false);
   const [ticketADetalle, setTicketADetalle] = useState(null);
   const [mensajePago, setMensajePago] = useState(null);
+  const [ahora, setAhora] = useState(new Date());
+
+  useEffect(() => {
+    const t = setInterval(() => setAhora(new Date()), 1000);
+    return () => clearInterval(t);
+  }, []);
 
   // Detectar retorno desde MercadoPago (?pago=success|failure|pending)
   useEffect(() => {
@@ -130,10 +136,14 @@ function App() {
       const resp = await fetchWithAuth(`/api/usuario/${usuario.dni}/fichas`);
       const data = await resp.json();
       if (resp.ok) {
-        setUsuario(prev => ({ ...prev, fichas: data.fichas }));
+        setUsuario(prev => {
+          const actualizado = { ...prev, fichas: data.fichas };
+          sessionStorage.setItem('sabes_usuario', JSON.stringify(actualizado));
+          return actualizado;
+        });
       }
     } catch (err) {
-      console.error("Error updating tokens:", err);
+      console.error("Error updating fichas:", err);
     }
   };
 
@@ -169,9 +179,34 @@ function App() {
 
       if (resp.ok && data.checkout_url) {
         if (data.modo === 'manual') {
-          alert("Resumen: Al usar el link estático, el crédito de fichas es realizado MANUALMENTE por el administrador una vez confirmado el pago.\n\nSerás redirigido ahora.");
+          alert("El crédito de fichas será realizado MANUALMENTE por el administrador una vez confirmado el pago.");
         }
-        window.location.href = data.checkout_url;
+        // Abrir MP en pestaña nueva, la app queda abierta
+        window.open(data.checkout_url, '_blank');
+        setShowModalCompra(false);
+        setMensajePago({ tipo: 'pending', texto: 'Completá el pago en la pestaña de Mercado Pago. Las fichas se acreditarán automáticamente.' });
+
+        // Polling: chequear este pago específico cada 3s hasta 2 minutos
+        const pagoId = data.pago_id;
+        const endpoint = pagoId
+          ? `/api/usuario/pago/${pagoId}`
+          : '/api/usuario/estado-ultimo-pago';
+        let intentos = 0;
+        const poll = setInterval(async () => {
+          intentos++;
+          try {
+            const r = await fetchWithAuth(endpoint);
+            const d = await r.json();
+            if (d.estado === 'aprobado') {
+              clearInterval(poll);
+              await actualizarFichas();
+              setMensajePago({ tipo: 'success', texto: `¡Fichas acreditadas! +${d.fichas} fichas en tu cuenta.` });
+            } else if (intentos >= 40) {
+              clearInterval(poll);
+              setMensajePago(null);
+            }
+          } catch { clearInterval(poll); }
+        }, 3000);
       } else {
         alert(data.error || "Error al iniciar el pago. Por favor, intenta de nuevo más tarde.");
       }
@@ -243,7 +278,7 @@ function App() {
       const resp = await fetchWithAuth('/api/jugada', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jugadas: todas })
+        body: JSON.stringify({ jugadas: todas, fecha_sorteo_id: proximaFecha.fecha_id })
       });
       const data = await resp.json();
       if (resp.ok) {
@@ -269,7 +304,19 @@ function App() {
   // El usuario ya tiene jugada guardada en la fecha activa
   const yaJugo = jugadaActiva !== null;
 
+  const optsZona = { timeZone: 'America/Argentina/Buenos_Aires' };
+  const fechaStr = ahora.toLocaleDateString('es-AR', { ...optsZona, weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' }).toUpperCase();
+  const horaStr  = ahora.toLocaleTimeString('es-AR', { ...optsZona, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
   return (
+    <>
+    <header className="app-header">
+      <img src="/logo.png" alt="Sabes de Fútbol" className="app-header-logo" />
+      <div className="app-header-reloj">
+        <span className="app-header-fecha">{fechaStr}</span>
+        <span className="app-header-hora">{horaStr}</span>
+      </div>
+    </header>
     <main className="container">
       {mensajePago && (
         <div className={`banner-pago banner-pago--${mensajePago.tipo}`}>
@@ -296,8 +343,8 @@ function App() {
           />
         )}
 
-        {/* Próxima fecha: visible solo cuando la fecha activa ya comenzó y existe fixture cargado */}
-        {fechaComenzada && proximaFecha && (
+        {/* Próxima fecha: visible cuando la fecha activa comenzó (o el usuario ya tiene jugada) y existe fixture cargado */}
+        {(fechaComenzada || jugadaActiva) && proximaFecha && (
           <div className="proxima-fecha-wrap">
             <div className="proxima-fecha-sep">📆 PRÓXIMA FECHA — ¡YA PODÉS JUGAR!</div>
             <Boleta
@@ -368,6 +415,7 @@ function App() {
         />
       )}
     </main>
+    </>
   );
 }
 

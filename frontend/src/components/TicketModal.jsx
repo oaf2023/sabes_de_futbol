@@ -1,4 +1,4 @@
-import React from 'react';
+import { fechaAR } from '../utils/fechaAR';
 
 export default function TicketModal({ ticket, dni, onClose }) {
     if (!ticket) return null;
@@ -7,7 +7,7 @@ export default function TicketModal({ ticket, dni, onClose }) {
     const nroFecha = ticket.nro_fecha || "00000";
     const jugadaId = String(ticket.id || 0).padStart(5, '0');
     const socioDni = dni || ticket.usuario_dni || "XXXXXXXX";
-    const fechaHora = ticket.fecha || ticket.fecha_hora || new Date().toLocaleString();
+    const fechaHora = fechaAR(ticket.fecha || ticket.fecha_hora);
 
     const handleDescargar = async () => {
         const area = document.getElementById('ticket-capture-area');
@@ -57,7 +57,7 @@ export default function TicketModal({ ticket, dni, onClose }) {
 
             <div className="ticket-boleta card-retro" id="ticket-capture-area" style={{ margin: '0' }}>
                 <div className="ticket-header">
-                    <h3>SABES DE FUTBOL</h3>
+                    <img src="/logo.png" alt="Sabes de Fútbol" className="ticket-logo" />
                     <p>COMPROBANTE DE JUGADA</p>
                     <div id="ticket-id" className="ticket-num">
                         JUGADA #{jugadaId}

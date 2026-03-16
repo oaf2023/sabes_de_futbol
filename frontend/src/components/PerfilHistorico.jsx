@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { fetchWithAuth } from '../utils/fetchWithAuth';
+import { fechaAR } from '../utils/fechaAR';
 
 export default function PerfilHistorico({ usuario, onVerTicket }) {
     const [historial, setHistorial] = useState([]);
@@ -41,13 +42,18 @@ export default function PerfilHistorico({ usuario, onVerTicket }) {
                         >
                             <div className="ticket-header-sm">
                                 <span>FECHA #{ticket.nro_fecha || '00000'}</span>
-                                <span className="fecha-sm">{ticket.fecha || ''}</span>
+                                <span className="fecha-sm">{fechaAR(ticket.fecha, false)}</span>
                             </div>
                             <div style={{ fontSize: '0.7rem', color: 'var(--color-acento)', marginBottom: '5px' }}>
                                 JUGADA #{String(ticket.id).padStart(5, '0')}
                             </div>
                             <div className="ticket-body-sm">
-                                <div className="aciertos-sm">{ticket.aciertos ?? 0} ACIERTOS</div>
+                                <div className="aciertos-sm">
+                                    {ticket.aciertos !== null && ticket.aciertos !== undefined
+                                        ? `${ticket.aciertos} ACIERTOS`
+                                        : 'EN CURSO'
+                                    }
+                                </div>
                                 <div style={{ fontSize: '0.65rem', color: 'var(--color-primario)', marginTop: '4px' }}>
                                     Hacé clic para ver detalle
                                 </div>

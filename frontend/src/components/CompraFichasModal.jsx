@@ -24,6 +24,9 @@ export default function CompraFichasModal({ fichasActuales = 0, onClose, onCompr
     return (
         <div className="modal-overlay">
             <div className="compra-fichas-card card-retro">
+                <div className="compra-fichas-logo-wrap">
+                    <img src="/logo.png" alt="Sabes de Fútbol" className="compra-fichas-logo" />
+                </div>
                 <h3 className="compra-fichas-titulo">COMPRAR FICHAS</h3>
 
                 <div className="compra-fichas-info">

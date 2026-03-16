@@ -63,7 +63,7 @@ body {
     grid-template-columns: minmax(0, 520px) minmax(0, 420px) minmax(0, 340px) minmax(0, 220px);
     gap: 1.5rem;
     max-width: 1560px;
-    margin: 0 auto;
+    margin: 62px auto 0;
     align-items: start;
 }
 
@@ -93,6 +93,64 @@ body {
 
 .boleta-digital:hover {
     transform: rotate(0deg) scale(1.02);
+}
+
+/* ── HEADER FIJO ── */
+.app-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    background: var(--color-primario);
+    border-bottom: 3px solid var(--color-acento);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+}
+
+.app-header-logo {
+    height: 44px;
+    object-fit: contain;
+}
+
+.app-header-reloj {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 1px;
+}
+
+.app-header-fecha {
+    font-family: var(--font-texto);
+    font-size: 0.65rem;
+    color: rgba(255,255,255,0.75);
+    letter-spacing: 1px;
+}
+
+.app-header-hora {
+    font-family: var(--font-numeros);
+    font-size: 1.4rem;
+    color: var(--color-acento);
+    letter-spacing: 2px;
+    line-height: 1;
+}
+
+
+/* ── LOGO EN LOGIN ── */
+.login-logo-wrap {
+    text-align: center;
+    padding: 10px 0 14px;
+    border-bottom: 2px dashed #ccc;
+    margin-bottom: 12px;
+}
+
+.login-logo {
+    max-width: 220px;
+    width: 80%;
+    object-fit: contain;
 }
 
 .boleta-header {
@@ -638,6 +696,29 @@ body {
     text-align: center;
 }
 
+/* Logo en ticket de jugada */
+.ticket-logo {
+    max-width: 160px;
+    width: 70%;
+    object-fit: contain;
+    display: block;
+    margin: 0 auto 6px;
+}
+
+/* Logo en modal de compra de fichas */
+.compra-fichas-logo-wrap {
+    text-align: center;
+    padding-bottom: 10px;
+    margin-bottom: 6px;
+    border-bottom: 1px dashed #ccc;
+}
+
+.compra-fichas-logo {
+    max-width: 150px;
+    width: 65%;
+    object-fit: contain;
+}
+
 .compra-fichas-titulo {
     font-family: var(--font-titulo);
     font-size: 1.3rem;
@@ -846,6 +927,31 @@ body {
 }
 
 /* ===== PANTALLA DE LOGIN ===== */
+
+/* Fichas cayendo */
+@keyframes caer-ficha {
+    0%   { transform: translateY(-120px) rotate(0deg); opacity: 0; }
+    10%  { opacity: 1; }
+    90%  { opacity: 0.8; }
+    100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+}
+
+.fichas-fondo {
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 9998;
+}
+
+.ficha-cayendo {
+    position: absolute;
+    top: -120px;
+    opacity: 0;
+    animation: caer-ficha linear infinite;
+    will-change: transform, opacity;
+}
+
 .login-overlay {
     position: fixed;
     inset: 0;

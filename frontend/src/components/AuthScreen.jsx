@@ -92,11 +92,28 @@ export default function AuthScreen({ onLogin }) {
 
     return (
         <div id="pantalla-login" className="login-overlay">
+            <div className="fichas-fondo">
+                {Array.from({ length: 12 }).map((_, i) => (
+                    <img
+                        key={i}
+                        src="/logo.png"
+                        alt=""
+                        className="ficha-cayendo"
+                        style={{
+                            left: `${(i * 8.5) % 100}%`,
+                            width: `${48 + (i % 3) * 20}px`,
+                            height: `${48 + (i % 3) * 20}px`,
+                            animationDuration: `${4 + (i % 5)}s`,
+                            animationDelay: `${(i * 0.7) % 5}s`,
+                        }}
+                    />
+                ))}
+            </div>
             <div className="login-card card-retro">
-                <div className="boleta-header">
-                    <h1 className="logo-sabes">SABES DE FUTBOL</h1>
-                    <div className="boleta-numero">CARNET DE SOCIO</div>
+                <div className="login-logo-wrap">
+                    <img src="/logo.png" alt="Sabes de Fútbol" className="login-logo" />
                 </div>
+                <div className="boleta-numero" style={{ textAlign: 'center', marginBottom: '8px' }}>CARNET DE SOCIO</div>
 
                 <div className="login-tabs">
                     <button
