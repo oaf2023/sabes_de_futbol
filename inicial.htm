@@ -1,0 +1,322 @@
+<!--
+Nombre: sabes_de_futbol_experience.html
+Fecha: 2026-03-14
+Utilidad: Landing page interactiva con estética de césped y evolución histórica.
+Función/API: Código autónomo con animaciones CSS3 y Tailwind.
+Descripción: Interfaz que transiciona desde los 70 hasta la pasión del hincha actual, 
+            con fondos de césped, cuadros orgánicos y animaciones de texto.
+-->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sabes de Futbol - La Pasión</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --grass-dark: #1a3a1a;
+            --grass-light: #2d5a27;
+            --modern-blue: #0ea5e9;
+        }
+
+        body {
+            background-color: var(--grass-dark);
+            color: white;
+            font-family: 'Inter', sans-serif;
+            overflow-x: hidden;
+            margin: 0;
+        }
+
+        /* Fondo Simil Césped con Textura */
+        .grass-bg {
+            background: 
+                radial-gradient(circle at 50% 50%, rgba(45, 90, 39, 0.4) 0%, transparent 100%),
+                linear-gradient(135deg, #1a3a1a 0%, #0d1f0d 100%);
+            background-attachment: fixed;
+            position: relative;
+        }
+
+        .grass-bg::before {
+            content: "";
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-image: url('https://www.transparenttextures.com/patterns/pinstripe-dark.png');
+            opacity: 0.1;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        /* Cuadros No Formales (Orgánicos) */
+        .era-card {
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            border-radius: 30% 70% 70% 30% / 30% 30% 70% 70%;
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .era-card:hover {
+            transform: scale(1.05) rotate(2deg);
+            border-radius: 50% 50% 50% 50% / 50% 50% 50% 50%;
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .card-70s { transform: rotate(-2deg); border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; }
+        .card-90s { transform: rotate(1deg); border-radius: 40% 60% 70% 30% / 40% 70% 30% 60%; }
+        .card-digital { transform: rotate(-1deg); border-radius: 70% 30% 50% 50% / 30% 30% 70% 70%; }
+        .card-hinchas { transform: rotate(2deg); background: rgba(220, 38, 38, 0.1); border-color: rgba(220, 38, 38, 0.3); }
+
+        /* Título Principal */
+        .main-title {
+            font-family: 'Bebas Neue', cursive;
+            letter-spacing: 6px;
+            background: linear-gradient(to right, #fff, #818cf8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-size: 5.5rem;
+            filter: drop-shadow(0 5px 15px rgba(0,0,0,0.8));
+        }
+
+        /* Animación Frase Hinchas (Creciendo desde un punto) */
+        @keyframes grow-text {
+            0% { transform: scale(0); opacity: 0; letter-spacing: -10px; }
+            10% { opacity: 1; }
+            50% { transform: scale(1.1); letter-spacing: 2px; }
+            90% { transform: scale(1); opacity: 1; }
+            100% { transform: scale(1.2); opacity: 0; }
+        }
+
+        .hinchas-text {
+            display: inline-block;
+            animation: grow-text 5s infinite ease-in-out;
+            transform-origin: center;
+        }
+
+        /* Preguntas Flotantes */
+        .floating-question {
+            position: fixed;
+            padding: 0.8rem 1.5rem;
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(12px);
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            font-size: 0.9rem;
+            z-index: 40;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.8s ease;
+        }
+
+        /* Menú Lateral */
+        #sidebar {
+            height: 100vh;
+            width: 280px;
+            position: fixed;
+            top: 0;
+            left: -280px;
+            background: rgba(10, 25, 10, 0.98);
+            backdrop-filter: blur(20px);
+            z-index: 100;
+            transition: left 0.5s cubic-bezier(0.77, 0, 0.175, 1);
+            border-right: 2px solid #2d5a27;
+        }
+
+        #sidebar.open { left: 0; }
+
+        .sidebar-item {
+            padding: 1.25rem 2rem;
+            font-weight: 600;
+            transition: all 0.3s;
+            border-left: 4px solid transparent;
+        }
+
+        .sidebar-item:hover {
+            background: rgba(45, 90, 39, 0.3);
+            border-left-color: #4ade80;
+            padding-left: 2.5rem;
+        }
+
+        /* Iconos SVG personalizados */
+        .soccer-icon {
+            width: 40px;
+            height: 40px;
+            fill: currentColor;
+            opacity: 0.4;
+        }
+    </style>
+</head>
+<body class="grass-bg">
+
+    <!-- Menú Lateral -->
+    <div id="sidebar">
+        <div class="p-10 text-3xl font-bold text-green-400 font-['Bebas_Neue'] tracking-widest border-b border-green-900/50">SDF MENU</div>
+        <nav class="mt-10">
+            <div class="sidebar-item" onclick="alert('Accediendo al estadio virtual...')">Inicio de sesión</div>
+            <div class="sidebar-item" onclick="alert('Consultando al VAR...')">Consultas</div>
+            <div class="sidebar-item text-gray-500 text-sm mt-10">Historial de Partidos</div>
+            <div class="sidebar-item text-gray-500 text-sm">Reglas del Juego</div>
+        </nav>
+        <div class="absolute bottom-10 left-10 text-[10px] uppercase tracking-tighter text-green-800">Sabes de Futbol Experience 2.0</div>
+    </div>
+
+    <!-- Toggle Button -->
+    <button id="menu-toggle" class="fixed top-8 left-8 z-[110] bg-green-600 p-4 rounded-xl shadow-2xl hover:bg-green-500 transition-all active:scale-95">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" x2="18"/></svg>
+    </button>
+
+    <!-- Preguntas Flotantes -->
+    <div id="q1" class="floating-question">¿Seguro sabes de futbol?</div>
+    <div id="q2" class="floating-question">¿Sabes qué pasa con tu equipo?</div>
+    <div id="q3" class="floating-question">¿Y los jugadores?</div>
+
+    <main class="relative z-10 min-h-screen">
+        <header class="text-center pt-24 pb-16">
+            <h1 class="main-title mb-2">SABES DE FUTBOL</h1>
+            <div class="h-1 w-32 bg-green-500 mx-auto rounded-full mb-6"></div>
+            <p class="text-green-200/60 max-w-xl mx-auto px-6 italic">La evolución de un sentimiento que no entiende de razones.</p>
+        </header>
+
+        <section class="container mx-auto px-8 pb-32">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 items-stretch">
+                
+                <!-- Cuadro 70s -->
+                <div class="era-card card-70s p-10 flex flex-col justify-between">
+                    <div>
+                        <span class="text-orange-400 text-xs font-bold uppercase tracking-widest">Años 70</span>
+                        <h3 class="text-3xl font-bold mt-2 mb-4">Barro y Gloria</h3>
+                        <p class="text-orange-100/40 text-sm leading-relaxed">Balones de tiento, estadios llenos de humo y la mística de la radio.</p>
+                    </div>
+                    <div class="mt-8 flex justify-center opacity-20">
+                        <svg class="soccer-icon" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/><circle cx="12" cy="12" r="3"/></svg>
+                    </div>
+                </div>
+
+                <!-- Cuadro 90s -->
+                <div class="era-card card-90s p-10 flex flex-col justify-between bg-blue-900/10 border-blue-800/30">
+                    <div>
+                        <span class="text-blue-400 text-xs font-bold uppercase tracking-widest">Años 90</span>
+                        <h3 class="text-3xl font-bold mt-2 mb-4">Marketing Total</h3>
+                        <p class="text-blue-100/40 text-sm leading-relaxed">Botines de colores, la llegada de la TV satelital y los Galácticos.</p>
+                    </div>
+                    <div class="mt-8 flex justify-center opacity-20">
+                        <svg class="soccer-icon" viewBox="0 0 24 24"><path d="M21 16.5c0 .38-.21.71-.53.88l-7.97 4.44c-.16.09-.34.14-.5.14s-.34-.05-.5-.14l-7.97-4.44c-.32-.17-.53-.5-.53-.88V7.5c0-.38.21-.71.53-.88l7.97-4.44c.16-.09.34-.14.5-.14s.34.05.5.14l7.97 4.44c.32.17.53.5.53.88v9z"/></svg>
+                    </div>
+                </div>
+
+                <!-- Cuadro Digital -->
+                <div class="era-card card-digital p-10 flex flex-col justify-between bg-cyan-900/10 border-cyan-800/30">
+                    <div>
+                        <span class="text-cyan-400 text-xs font-bold uppercase tracking-widest">Era Digital</span>
+                        <h3 class="text-3xl font-bold mt-2 mb-4">Big Data & VAR</h3>
+                        <p class="text-cyan-100/40 text-sm leading-relaxed">Mapas de calor, GPS en el pecho y el fin de la polémica... o no.</p>
+                    </div>
+                    <div class="mt-8 flex justify-center opacity-20">
+                        <svg class="soccer-icon" viewBox="0 0 24 24"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9l-7-7z"/><polyline points="13 2 13 9 20 9"/></svg>
+                    </div>
+                </div>
+
+                <!-- NUEVO CUADRO: LOS HINCHAS -->
+                <div class="era-card card-hinchas p-10 flex flex-col items-center justify-center text-center relative overflow-hidden group">
+                    <!-- Decoración fondo cuadro -->
+                    <div class="absolute inset-0 opacity-10 flex flex-wrap justify-around p-4 pointer-events-none">
+                        <!-- Arcos -->
+                        <svg class="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1"><path d="M3 21V10a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v11"/></svg>
+                        <!-- Pelotas -->
+                        <svg class="w-6 h-6" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/><path d="M12 2v20M2 12h20" stroke="white" stroke-width="1"/></svg>
+                        <!-- Botines -->
+                        <svg class="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1"><path d="M4 18l4-4 4 4m-4-4v6m10-10l4 4-4 4m4-4H10"/></svg>
+                    </div>
+                    
+                    <div class="relative z-10">
+                        <span class="text-red-500 text-[10px] font-bold uppercase tracking-[0.3em] mb-4 block">Sentimiento Eterno</span>
+                        <div class="h-32 flex items-center justify-center">
+                            <h3 class="hinchas-text text-4xl font-black text-white leading-tight uppercase font-['Bebas_Neue']">
+                                ¿Y nosotros <br> <span class="text-red-500">los Hinchas?</span>
+                            </h3>
+                        </div>
+                        <div class="mt-4 flex gap-2 justify-center">
+                            <div class="w-2 h-2 rounded-full bg-red-600 animate-ping"></div>
+                            <div class="w-2 h-2 rounded-full bg-red-600"></div>
+                            <div class="w-2 h-2 rounded-full bg-red-600 animate-ping"></div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- Gráfico Estilizado Final -->
+        <section class="container mx-auto px-8 mb-40">
+            <div class="bg-black/20 p-12 rounded-[50px] border border-white/5 relative overflow-hidden">
+                <div class="flex flex-col md:flex-row items-center justify-between gap-10">
+                    <div class="md:w-1/2">
+                        <h2 class="text-4xl font-bold mb-4">El Pulso de la Cancha</h2>
+                        <p class="text-green-200/40">Visualización de la interacción emocional del público durante un mundial.</p>
+                    </div>
+                    <div class="md:w-1/2 flex items-end justify-around h-40 gap-2">
+                        <div class="w-full bg-green-500/20 rounded-t-xl h-[30%] animate-pulse"></div>
+                        <div class="w-full bg-green-500/40 rounded-t-xl h-[60%]"></div>
+                        <div class="w-full bg-green-500/60 rounded-t-xl h-[45%] animate-bounce"></div>
+                        <div class="w-full bg-green-500/80 rounded-t-xl h-[90%]"></div>
+                        <div class="w-full bg-green-400 rounded-t-xl h-[100%] shadow-[0_0_20px_#4ade80]"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        // Toggle Sidebar
+        const sidebar = document.getElementById('sidebar');
+        const menuBtn = document.getElementById('menu-toggle');
+
+        menuBtn.addEventListener('click', () => {
+            sidebar.classList.toggle('open');
+            menuBtn.querySelector('svg').classList.toggle('rotate-90');
+        });
+
+        // Lógica de Preguntas Flotantes mejorada
+        const questions = [
+            document.getElementById('q1'),
+            document.getElementById('q2'),
+            document.getElementById('q3')
+        ];
+
+        function showQuestion(q) {
+            const x = Math.random() * (window.innerWidth - 250);
+            const y = Math.random() * (window.innerHeight - 100);
+            
+            q.style.left = `${x}px`;
+            q.style.top = `${y}px`;
+            q.style.opacity = '1';
+
+            setTimeout(() => {
+                q.style.opacity = '0';
+            }, 4000);
+        }
+
+        setInterval(() => {
+            const randomQ = questions[Math.floor(Math.random() * questions.length)];
+            showQuestion(randomQ);
+        }, 6000);
+
+        // Iniciador de scroll suave y observer
+        const cards = document.querySelectorAll('.era-card');
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('opacity-100', 'translate-y-0');
+                    entry.target.classList.remove('opacity-0', 'translate-y-10');
+                }
+            });
+        }, { threshold: 0.1 });
+
+        cards.forEach(card => {
+            card.classList.add('opacity-0', 'translate-y-10', 'transition-all', 'duration-700');
+            observer.observe(card);
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,264 @@
+<!--
+Nombre: index.html
+Fecha: 2026-03-04
+Versión: 2.1
+Creador: OAF
+Propósito: Interfaz principal de SABES DE FUTBOL.
+Funcionamiento: Estructura HTML5 semántica que aloja la boleta, carnet de socio, panel de resultados y tabla de premios. Optimizado para móvil.
+Fuentes de datos: Renderizado dinámico vía script.js.
+Ejemplo de uso: Abrir en cualquier navegador moderno.
+-->
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sabes de Fútbol</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Special+Elite&family=VT323&display=swap" rel="stylesheet">
+
+    <!-- Styles -->
+    <link rel="stylesheet" href="style.css">
+    <!-- html2canvas for PNG download -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+</head>
+
+<body>
+
+    <!-- ===== PANTALLA DE LOGIN ===== -->
+    <div id="pantalla-login" class="login-overlay">
+        <div class="login-card card-retro">
+
+            <!-- Encabezado -->
+            <div class="boleta-header">
+                <h1 class="logo-sabes">SABES DE FUTBOL</h1>
+                <div class="boleta-numero">CARNET DE SOCIO</div>
+            </div>
+
+            <!-- Tabs Login / Registro -->
+            <div class="login-tabs">
+                <button id="tab-login" class="tab-btn active" onclick="mostrarTab('login')">INGRESAR</button>
+                <button id="tab-registro" class="tab-btn" onclick="mostrarTab('registro')">NUEVO SOCIO</button>
+            </div>
+
+            <!-- Formulario LOGIN -->
+            <form id="form-login" class="login-form" onsubmit="handleLogin(event)">
+                <label>Nº de Documento</label>
+                <input type="text" id="login-dni" placeholder="Ej: 12345678" required>
+                <label>Contraseña</label>
+                <input type="password" id="login-pass" placeholder="Tu clave secreta" required>
+                <button type="submit" class="btn-jugar">INGRESAR AL CLUB</button>
+                <p id="login-error" class="login-error"></p>
+            </form>
+
+            <!-- Formulario REGISTRO -->
+            <form id="form-registro" class="login-form" style="display:none" onsubmit="handleRegistro(event)">
+                <label>Nº de Documento *</label>
+                <input type="text" id="reg-dni" placeholder="Ej: 12345678" required>
+                <label>Teléfono *</label>
+                <input type="tel" id="reg-tel" placeholder="Ej: 11 4321-8765" required>
+                <label>Correo Electrónico</label>
+                <input type="email" id="reg-email" placeholder="ejemplo@correo.com">
+                <label>Fecha de Nacimiento *</label>
+                <input type="date" id="reg-nacimiento" required>
+                <label>Nombre y Apellido *</label>
+                <input type="text" id="reg-nombre" placeholder="Juan Pérez" required>
+                <label>Dirección *</label>
+                <input type="text" id="reg-dir" placeholder="Calle, Nro, Provincia" required>
+                <label>Contraseña *</label>
+                <input type="password" id="reg-pass" placeholder="Elegí una clave" required>
+                <label>Foto DNI (Frente) *</label>
+                <input type="file" id="reg-dni-frente" accept="image/*" required>
+                <label>Foto DNI (Dorso) *</label>
+                <input type="file" id="reg-dni-dorso" accept="image/*" required>
+                <label>Foto Personal (Selfie) *</label>
+                <input type="file" id="reg-selfie" accept="image/*" required>
+                <button type="submit" class="btn-jugar">SELLAR REGISTRO</button>
+                <p id="reg-error" class="login-error"></p>
+            </form>
+
+        </div>
+    </div><!-- /pantalla-login -->
+
+    <main class="container">
+
+        <!-- COMPONENTE 1: BOLETA DIGITAL -->
+        <section class="boleta-digital card-retro">
+            <div class="boleta-header">
+                <h1 class="logo-sabes">SABES DE FUTBOL</h1>
+                <div class="boleta-numero">FECHA Nº <span id="nro-fecha" class="num-rojo">00000</span></div>
+            </div>
+
+            <div class="boleta-grid">
+                <div class="row header-row">
+                    <span class="partido">PARTIDO</span>
+                    <span class="opcion">L</span>
+                    <span class="opcion">E</span>
+                    <span class="opcion">V</span>
+                </div>
+
+                <!-- Generaremos 13 filas con JS o HTML directo -->
+                <div id="filas-boleta"></div>
+            </div>
+
+            <div id="status-jugadas" class="status-panel">
+                <div class="status-info">
+                    <p>Fichas: <span id="user-fichas" class="dato">0</span></p>
+                    <p>Pendientes: <span id="pendientes-count" class="dato">0</span></p>
+                </div>
+                <button id="btn-comprar-fichas" class="btn-retro-sm">COMPRAR FICHAS</button>
+            </div>
+
+            <div class="botones-juego">
+                <button id="btn-otra-jugada" class="btn-jugar">OTRA JUGADA</button>
+                <button id="btn-confirmar-boleta" class="btn-jugar">JUEGA BOLETA</button>
+            </div>
+        </section>
+
+
+        <!-- COLUMNA CENTRAL: PANEL Y PERFIL -->
+        <div class="col-central">
+            <!-- COMPONENTE 4: PERFIL DE JUGADOR -->
+            <section class="perfil-jugador card-retro flex-row">
+                <div class="foto-carnet">
+                    <img id="foto-jugador" src="" alt="Socio"
+                        onerror="this.src='https://via.placeholder.com/100x120?text=Socio'">
+                </div>
+                <div class="datos-socio">
+                    <h2>CARNET DE SOCIO</h2>
+                    <p>Socio: <span id="socio-dni" class="dato">XXXXXXXXX</span></p>
+                    <p>Nombre: <span id="socio-direccion" class="dato"></span></p>
+                    <p>Pais: <span id="socio-pais" class="dato">Argentina</span></p>
+                    <button id="btn-historial" class="btn-retro-sm">MIS JUGADAS (HISTORIAL)</button>
+                </div>
+            </section>
+
+            <!-- COMPONENTE 2: PANEL DE SORTEO -->
+            <section class="panel-sorteo card-pizarron">
+                <h2 class="titulo-pizarron">RESULTADOS EN VIVO</h2>
+                <div class="fecha-panel-contenedor">
+                    <span id="fecha-actual-panel" class="fecha-pizarron">Cargando fecha...</span>
+                </div>
+
+                <div class="ruleta-container">
+                    <div class="ruleta-slot" id="slot-1">?</div>
+                </div>
+
+                <div class="ticker-resultados">
+                    <div class="ticker-text">BOCA 2 - 1 RIVER | RACING 0 - 0 INDEPENDIENTE | SAN LORENZO 1 - 0 HURACAN |
+                    </div>
+                </div>
+            </section>
+
+            <!-- COMPONENTE: COMPROBANTE DE JUGADA (TICKET INLINE) -->
+            <div id="container-ticket" class="ticket-inline oculto">
+                <div class="ticket-boleta card-retro" id="ticket-capture-area">
+                    <div class="ticket-header">
+                        <h3>SABES DE FUTBOL</h3>
+                        <p>COMPROBANTE DE JUGADA</p>
+                        <div id="ticket-id" class="ticket-num">JUGADA #00000</div>
+                    </div>
+                    <hr>
+                    <div id="ticket-datos-usuario">
+                        <p>Socio: <span id="t-dni"></span></p>
+                        <p>Fecha: <span id="t-fecha">9</span> - <span id="t-timestamp"></span></p>
+                    </div>
+                    <hr>
+                    <div id="ticket-lista-partidos" class="ticket-lista">
+                        <!-- Se llena con JS -->
+                    </div>
+                    <hr>
+                    <div class="ticket-footer no-print">
+                        <p>¡MUCHA SUERTE!</p>
+                        <button onclick="descargarTicket()" class="btn-retro-sm">DESCARGAR IMAGEN (.PNG)</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+        <!-- COLUMNA DERECHA: PREMIOS E HISTORIAL -->
+        <div class="col-derecha">
+            <!-- COMPONENTE 3: TABLA DE PREMIOS -->
+            <section class="tabla-premios card-madera">
+                <h2>POZO ACUMULADO</h2>
+                <div class="premio-mayor glow">
+                    <span class="currency">$</span>
+                    <span class="amount" id="pozo-total">1.000.000</span>
+                </div>
+
+                <ul class="lista-premios" id="premios-dinamicos">
+                    <!-- Se llena con JS según la cantidad de partidos -->
+                </ul>
+            </section>
+
+            <!-- HISTORIAL CON ESTILO DE TICKET (NUEVO) -->
+            <section class="historial-tickets card-madera" style="margin-top: 20px;">
+                <h2 class="titulo-pizarron">MIS JUGADAS</h2>
+                <div id="historial-ticket-style" class="historial-container-inline">
+                    <p class="no-jugadas">Iniciá sesión para ver tu historial.</p>
+                </div>
+            </section>
+        </div>
+
+    </main>
+
+    <!-- Audio placeholders -->
+    <audio id="audio-estadio" loop src=""></audio>
+    <audio id="audio-click" src=""></audio>
+    <audio id="audio-gol" src=""></audio>
+    <audio id="audio-fanfarria" src=""></audio>
+    <audio id="audio-derrota" src=""></audio>
+
+
+    <!-- MODAL DE COMPRA DE FICHAS -->
+    <div id="modal-compra-fichas" class="modal-overlay oculto">
+        <div class="compra-fichas-card card-retro">
+            <h3>COMPRAR FICHAS</h3>
+            <p>Elegí un paquete para seguir jugando:</p>
+
+            <div class="paquetes-container">
+                <div class="paquete-item card-retro" onclick="comprarPaquete('starter')">
+                    <span class="paquete-titulo">STARTER</span>
+                    <span class="paquete-fichas">5 FICHAS</span>
+                    <span class="paquete-precio">$1.000</span>
+                </div>
+                <div class="paquete-item card-retro selected" onclick="comprarPaquete('normal')">
+                    <span class="paquete-titulo">NORMAL</span>
+                    <span class="paquete-fichas">12 FICHAS</span>
+                    <span class="paquete-precio">$2.000</span>
+                </div>
+                <div class="paquete-item card-retro" onclick="comprarPaquete('pro')">
+                    <span class="paquete-titulo">PRO</span>
+                    <span class="paquete-fichas">30 FICHAS</span>
+                    <span class="paquete-precio">$4.500</span>
+                </div>
+            </div>
+
+            <p class="nota-pago">Serás redirigido a Mercado Pago para completar la operación.</p>
+
+            <button onclick="cerrarModalCompra()" class="btn-retro-sm">CANCELAR</button>
+        </div>
+    </div>
+
+    <!-- MODAL DE HISTORIAL -->
+    <div id="modal-historial" class="modal-overlay oculto">
+        <div class="historial-card card-retro">
+            <h3>HISTORIAL DE JUGADAS</h3>
+            <div id="lista-historial" class="lista-items">
+                <!-- Se llena con JS -->
+            </div>
+            <button onclick="cerrarHistorial()" class="btn-retro-sm">VOLVER AL JUEGO</button>
+        </div>
+    </div>
+
+    <script src="js/api.js"></script>
+    <script src="script.js"></script>
+
+</body>
+
+</html>
