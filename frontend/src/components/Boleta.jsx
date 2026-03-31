@@ -4,6 +4,7 @@ export default function Boleta({
     partidos,
     nroFecha,
     usuarioDni,
+    numeroDeSocio, // Nueva prop
     fichas = 0,
     pendientes = 0,
     fechaComenzada = false,   // true = la fecha ya arrancó, no se puede jugar
@@ -47,7 +48,11 @@ export default function Boleta({
     };
 
     const handleConfirmarBoleta = async () => {
-        if (bloqueada || !todosSeleccionados) return;
+        if (bloqueada) return;
+        if (!todosSeleccionados) {
+            alert("⚠️ Debes marcar todos los resultados antes de jugar.");
+            return;
+        }
         setLoading(true);
         onJugar([...boletaUsuario]);
         setBoletaUsuario(new Array(partidos.length).fill(null));
@@ -108,8 +113,9 @@ export default function Boleta({
                 </div>
             </div>
 
-            <div id="status-jugadas" className="status-panel">
-                <div className="status-info">
+            <div id="status-jugadas" className="status-panel-minimal">
+                <div className="status-info-row">
+                    <p>Socio: <span className="dato">{numeroDeSocio}</span></p>
                     <p>Fichas: <span className="dato" id="user-fichas">{fichas}</span></p>
                     <p>Pendientes: <span className="dato" id="pendientes-count">{pendientes}</span></p>
                 </div>
@@ -136,8 +142,7 @@ export default function Boleta({
                     id="btn-confirmar-boleta"
                     className={`btn-jugar${todosSeleccionados && !bloqueada ? ' btn-jugar--listo' : ''}`}
                     onClick={handleConfirmarBoleta}
-                    disabled={loading || partidos.length === 0 || bloqueada || !todosSeleccionados}
-                    title={!todosSeleccionados ? 'Marcá todos los partidos para habilitar' : ''}
+                    disabled={loading || partidos.length === 0 || bloqueada}
                 >
                     {loading ? 'PROCESANDO...' : 'JUEGA BOLETA'}
                 </button>

@@ -24,28 +24,35 @@ export default function PerfilJugador({ usuario, onLogout, onAbrirCuenta }) {
                     </div>
                 </div>
                 <div className="col-datos">
-                    <p className="dato-item"><strong>Socio:</strong> {usuario.dni}</p>
-                    <p className="dato-item"><strong>Nombre:</strong> {usuario.nombre}</p>
-                    <p className="dato-item"><strong>Pais:</strong> Argentina</p>
+                    <p className="dato-item"><strong>Socio:</strong> {usuario.numero_de_socio}</p>
+                    <p className="dato-item"><strong>Usuario:</strong> {usuario.nombre_de_usuario}</p>
+                    <p className="dato-item"><strong>Nombre:</strong> {usuario.nombre || 'Sin completar'}</p>
                 </div>
             </div>
 
             <div className="carnet-actions">
-                <button className="btn-jugadas-classic" onClick={() => {}}>
-                    MIS JUGADAS<br />(HISTORIAL)
+                <button className={`btn-jugadas-classic ${(usuario.fichas_ganadas || 0) < 50000 ? 'btn-canje-bloqueado' : ''}`} 
+                        onClick={() => {
+                            if ((usuario.fichas_ganadas || 0) < 50000) {
+                                alert("⚠️ No estás en condiciones de canje (mínimo 50.000 fichas ganadas).");
+                            } else {
+                                // Lógica de canje
+                            }
+                        }}>
+                    CANJEAR<br />PREMIOS
                 </button>
                 <button className="btn-logout-classic" onClick={onLogout}>
                     Cerrar<br />Sesión
                 </button>
             </div>
 
-            <div className={`carnet-status-banner ${usuario.completado === 'SI' ? 'status-valido' : 'status-pendiente'}`}>
-                {usuario.completado === 'SI' ? '✓ DATOS COMPLETOS' : '⚠ DATOS INCOMPLETOS'}
+            <div className={`carnet-status-banner status-valido`}>
+                Socio Activo
             </div>
-            
-            {usuario.completado === 'NO' && (
-                <div className="aviso-datos-incompletos">
-                    Mientras los datos estén INCOMPLETOS no podrá reclamar el cambio de las fichas ganadas, SOLO podrá adquirir y realizar jugadas.
+
+            {(usuario.fichas || 0) < 2500 && (
+                <div className="aviso-fichas-insuficientes">
+                    ⚠️ Fichas insuficientes
                 </div>
             )}
         </section>

@@ -232,33 +232,53 @@ body {
     text-align: center;
 }
 
-.status-panel {
+.status-panel-minimal {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: rgba(26, 82, 118, 0.05);
-    padding: 10px;
+    background: transparent;
+    border-top: 1px dashed var(--color-primario);
+    padding: 10px 0;
     margin-top: 15px;
-    border: 1px dashed var(--color-primario);
-    border-radius: 4px;
+    width: 100%;
 }
 
-.status-info {
+.status-info-row {
     display: flex;
-    flex-direction: column;
-    gap: 2px;
+    gap: 15px;
+    align-items: center;
+    flex-wrap: wrap;
 }
 
-.status-info p {
-    font-size: 0.9rem;
+.status-info-row p {
+    font-size: 1rem;
     font-weight: bold;
     color: var(--color-primario);
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 5px;
 }
 
-.status-info .dato {
+.status-info-row .dato {
     font-family: var(--font-numeros);
-    font-size: 1.1rem;
+    font-size: 1.2rem;
     color: var(--color-error);
+}
+
+.btn-retro-sm {
+    background-color: var(--color-primario) !important;
+    color: white !important;
+    padding: 8px 15px !important;
+    font-family: var(--font-titulo);
+    font-size: 0.9rem !important;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.btn-retro-sm:hover {
+    background-color: var(--color-acento) !important;
 }
 
 #btn-comprar-fichas {
@@ -293,6 +313,163 @@ body {
 .btn-jugar:active {
     transform: translate(2px, 2px);
     box-shadow: 2px 2px 0px rgba(0, 0, 0, 0.2);
+}
+
+/* MODALES RETRO / REGLAMENTO */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+    padding: 20px;
+}
+
+.modal-content-retro {
+    background: #fdf5e6; /* Old paper color */
+    border: 3px solid var(--color-primario);
+    width: 100%;
+    max-width: 600px;
+    height: 80vh; /* Altura fija para que el scroll funcione */
+    display: flex;
+    flex-direction: column;
+    padding: 30px;
+    position: relative;
+    box-shadow: 10px 10px 0px rgba(0, 0, 0, 0.3);
+    border-radius: 2px;
+}
+
+.modal-text-handwritten {
+    font-family: 'Comic Sans MS', 'Segoe Print', 'Cursive', sans-serif;
+    line-height: 1.6;
+    color: #333;
+    font-size: 1.1rem;
+    overflow-y: auto; /* Scroll interno */
+    flex: 1;
+    padding-right: 10px;
+}
+
+/* BOTONES DENTRO DEL CARNET (ESTILO MEJORADO) */
+.login-card-footer {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 1px dashed rgba(0, 0, 0, 0.1);
+}
+
+.btn-retro-circle {
+    width: 65px;
+    height: 65px;
+    border-radius: 50%;
+    border: 3px solid #fff;
+    color: white;
+    font-family: var(--font-titulo);
+    font-size: 0.7rem;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.3);
+    transition: all 0.2s;
+    text-align: center;
+    line-height: 1.1;
+    padding: 5px;
+    text-transform: uppercase;
+}
+
+.btn-reglamento-card { background-color: #27ae60; }
+.btn-comojugar-card { background-color: #2980b9; }
+
+.btn-retro-circle:hover {
+    transform: scale(1.1) rotate(5deg);
+    box-shadow: 4px 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+/* MODALES MEJORADOS (CUBRE TODA LA CARD) */
+.login-card-modal {
+    position: absolute;
+    inset: 0;
+    background: #fdfaf0; /* Mismo fondo que la card */
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+    border-radius: inherit;
+    animation: slideInUp 0.3s ease-out;
+}
+
+@keyframes slideInUp {
+    from { transform: translateY(20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+.modal-header-retro {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 2px solid var(--color-primario);
+    padding-bottom: 10px;
+    margin-bottom: 15px;
+}
+
+.modal-body-retro {
+    flex: 1;
+    overflow-y: auto;
+    font-family: var(--font-cuerpo);
+    font-size: 0.9rem;
+    line-height: 1.5;
+    padding-right: 10px;
+}
+
+/* Scrollbar retro para el cuerpo del modal */
+.modal-body-retro::-webkit-scrollbar { width: 6px; }
+.modal-body-retro::-webkit-scrollbar-track { background: #eee; }
+.modal-body-retro::-webkit-scrollbar-thumb { background: var(--color-primario); border-radius: 3px; }
+
+.btn-cerrar-retro {
+    background: var(--color-error);
+    color: white;
+    border: none;
+    padding: 5px 12px;
+    font-family: var(--font-titulo);
+    cursor: pointer;
+    border-radius: 4px;
+    font-size: 0.8rem;
+}
+
+/* STATS UNIFICADOS EN UNA LINEA */
+.login-stats-box {
+    margin: 10px 0;
+    padding: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+    text-align: center;
+}
+
+.stat-unica-linea {
+    font-family: var(--font-titulo);
+    font-size: 0.95rem;
+    color: var(--color-primario);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    letter-spacing: 0.5px;
+}
+
+.stat-valor-destacado {
+    color: var(--color-error);
+    font-family: var(--font-numeros);
+    font-weight: bold;
+    font-size: 1.1rem;
 }
 
 /* COLUMNA IZQUIERDA — envuelve boleta activa + próxima fecha */
@@ -457,6 +634,19 @@ body {
     font-size: 6rem;
     color: var(--color-acento);
     text-shadow: 0 0 10px var(--color-acento);
+}
+
+.ruleta-slot-info {
+    font-family: var(--font-titulo);
+    font-size: 2.5rem;
+    color: var(--color-secundario);
+    text-align: center;
+}
+
+.resultado-listo {
+    color: #fff;
+    font-weight: bold;
+    text-shadow: 0 0 5px #fff;
 }
 
 .ticker-resultados {
@@ -1231,9 +1421,9 @@ body {
 }
 
 .btn-jugadas-classic {
-    background-color: #1a5276 !important;
+    background-color: #27ae60 !important;
     color: white !important;
-    border: 1px solid #154360 !important;
+    border: 1px solid #1e8449 !important;
     border-radius: 4px !important;
     padding: 8px 10px !important;
     font-weight: 800 !important;
@@ -1244,6 +1434,22 @@ body {
     box-shadow: 1px 1px 3px rgba(0,0,0,0.2) !important;
     line-height: 1.3 !important;
     text-align: center !important;
+    transition: all 0.2s ease !important;
+}
+
+.btn-jugadas-classic:hover {
+    background-color: #2ecc71 !important;
+}
+
+.btn-canje-bloqueado {
+    background-color: #27ae60 !important;
+    opacity: 0.5 !important;
+    cursor: not-allowed !important;
+    box-shadow: none !important;
+}
+
+.btn-canje-bloqueado:hover {
+    background-color: #27ae60 !important;
 }
 
 .btn-logout-classic {
@@ -1263,6 +1469,26 @@ body {
     justify-content: center !important;
     text-align: center !important;
     text-transform: uppercase !important;
+}
+
+.aviso-fichas-insuficientes {
+    background-color: #fce4e4 !important;
+    color: #c0392b !important;
+    border: 1px solid #c0392b !important;
+    border-radius: 4px !important;
+    padding: 8px !important;
+    margin-top: 10px !important;
+    text-align: center !important;
+    font-weight: 800 !important;
+    font-size: 14px !important;
+    text-transform: uppercase !important;
+    animation: pulse-red 2s infinite !important;
+}
+
+@keyframes pulse-red {
+    0% { background-color: #fce4e4; }
+    50% { background-color: #f9d1d1; }
+    100% { background-color: #fce4e4; }
 }
 
 .carnet-status-banner {

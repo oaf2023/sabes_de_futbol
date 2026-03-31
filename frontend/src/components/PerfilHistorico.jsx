@@ -7,14 +7,14 @@ export default function PerfilHistorico({ usuario, onVerTicket }) {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (usuario?.dni) {
-            fetchHistorial(usuario.dni);
+        if (usuario?.numero_de_socio) {
+            fetchHistorial(usuario.numero_de_socio);
         }
     }, [usuario]);
 
-    const fetchHistorial = async (dni) => {
+    const fetchHistorial = async (identificador) => {
         try {
-            const resp = await fetchWithAuth(`/api/historial/${dni}`);
+            const resp = await fetchWithAuth(`/api/historial/${identificador}`);
             const data = await resp.json();
             if (resp.ok) setHistorial(data);
         } catch (err) {

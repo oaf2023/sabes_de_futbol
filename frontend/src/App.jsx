@@ -324,43 +324,47 @@ function App() {
           <button className="banner-pago-cerrar" onClick={() => setMensajePago(null)}>✕</button>
         </div>
       )}
-      {/* Columna izquierda: boleta para jugar (si no comenzó) o boleta en curso + próxima fecha */}
+      {/* Columna izquierda: boleta para jugar o boleta en curso + próxima fecha */}
       <div className="col-izquierda">
-        {fechaComenzada && jugadaActiva ? (
-          <BoletaEnCurso jugada={jugadaActiva} nroFecha={nroFecha} />
-        ) : (
-          <Boleta
-            partidos={partidos}
-            nroFecha={nroFecha}
-            usuarioDni={usuario.dni}
-            fichas={usuario.fichas}
-            pendientes={jugadasPendientes.length}
-            fechaComenzada={fechaComenzada}
-            yaJugo={yaJugo}
-            onAgregarAlCarrito={(jugada) => setJugadasPendientes(prev => [...prev, jugada])}
-            onJugar={handleJugarBoletas}
-            onAbrirCompra={() => setShowModalCompra(true)}
-          />
-        )}
-
-        {/* Próxima fecha: visible cuando la fecha activa comenzó (o el usuario ya tiene jugada) y existe fixture cargado */}
-        {(fechaComenzada || jugadaActiva) && proximaFecha && (
-          <div className="proxima-fecha-wrap">
-            <div className="proxima-fecha-sep">📆 PRÓXIMA FECHA — ¡YA PODÉS JUGAR!</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {jugadaActiva ? (
+            <BoletaEnCurso jugada={jugadaActiva} nroFecha={nroFecha} />
+          ) : !fechaComenzada ? (
             <Boleta
-              partidos={proximaFecha.partidos}
-              nroFecha={proximaFecha.nro_fecha}
+              partidos={partidos}
+              nroFecha={nroFecha}
               usuarioDni={usuario.dni}
+              numeroDeSocio={usuario.numero_de_socio}
               fichas={usuario.fichas}
-              pendientes={jugadasPendientesProxima.length}
-              fechaComenzada={false}
-              yaJugo={false}
-              onAgregarAlCarrito={(jugada) => setJugadasPendientesProxima(prev => [...prev, jugada])}
-              onJugar={handleJugarBoletasProxima}
+              pendientes={jugadasPendientes.length}
+              fechaComenzada={fechaComenzada}
+              yaJugo={yaJugo}
+              onAgregarAlCarrito={(jugada) => setJugadasPendientes(prev => [...prev, jugada])}
+              onJugar={handleJugarBoletas}
               onAbrirCompra={() => setShowModalCompra(true)}
             />
-          </div>
-        )}
+          ) : null}
+
+          {/* Próxima fecha: visible cuando la fecha activa comenzó (o el usuario ya tiene jugada) y existe fixture cargado */}
+          {(fechaComenzada || yaJugo) && proximaFecha && (
+            <div className="proxima-fecha-wrap">
+              <div className="proxima-fecha-sep">📆 PRÓXIMA FECHA — ¡YA PODÉS JUGAR!</div>
+              <Boleta
+                partidos={proximaFecha.partidos}
+                nroFecha={proximaFecha.nro_fecha}
+                usuarioDni={usuario.dni}
+                numeroDeSocio={usuario.numero_de_socio}
+                fichas={usuario.fichas}
+                pendientes={jugadasPendientesProxima.length}
+                fechaComenzada={false}
+                yaJugo={false}
+                onAgregarAlCarrito={(jugada) => setJugadasPendientesProxima(prev => [...prev, jugada])}
+                onJugar={handleJugarBoletasProxima}
+                onAbrirCompra={() => setShowModalCompra(true)}
+              />
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="col-central" style={{ position: 'relative' }}>
@@ -372,6 +376,7 @@ function App() {
         <PanelSorteo
           partidos={partidos}
           estadoSorteo={estadoSorteo}
+          tieneJugada={!!jugadaActiva}
         />
         {showModalCompra && (
           <CompraFichasModal

@@ -1,70 +1,75 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import '../App.css';
 
-export default function AuthScreen({ onLogin }) {
+const AuthScreen = ({ onLogin }) => {
     const [isLogin, setIsLogin] = useState(true);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [success, setSuccess] = useState(null);
-    const [aceptarTerminos, setAceptarTerminos] = useState(false);
+    const [viewModal, setViewModal] = useState(null);
+    const [stats, setStats] = useState(null);
+    
+    // El contador de socios (Real + 1000)
+    const socioCount = stats?.total_socios || '1005';
 
     const [formData, setFormData] = useState({
-        dni: '',
+        socio: '',
         password: '',
+        usuario: '',
         nombre: '',
-        telefono: '',
-        direccion: '',
-        fecha_nac: '',
-        email: '',
         confirmPassword: ''
     });
 
+    useEffect(() => {
+        const fetchStats = async () => {
+            try {
+                const res = await fetch('/api/public_stats');
+                if (res.ok) {
+                    const data = await res.json();
+                    setStats(data);
+                }
+            } catch (err) {
+                console.error("Error stats", err);
+            }
+        };
+        fetchStats();
+    }, []);
+
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
+        setError(null);
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        
-        if (!isLogin) {
-            if (formData.password !== formData.confirmPassword) {
-                setError("Las contraseñas no coinciden.");
-                return;
-            }
-            if (!aceptarTerminos) {
-                setError("Debes aceptar los términos y condiciones para registrarte.");
-                return;
-            }
-        }
-
         setLoading(true);
         setError(null);
-        setSuccess(null);
 
-        const endpoint = isLogin ? '/api/login' : '/api/register';
+        if (!isLogin && formData.password !== formData.confirmPassword) {
+            setError("Las contraseñas no coinciden");
+            setLoading(false);
+            return;
+        }
 
         try {
+            const endpoint = isLogin ? '/api/login' : '/api/register';
             let resp;
+            
             if (isLogin) {
                 resp = await fetch(endpoint, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ dni: formData.dni, password: formData.password })
+                    body: JSON.stringify({
+                        socio: formData.socio,
+                        password: formData.password
+                    })
                 });
             } else {
                 const fd = new FormData();
-                fd.append('dni', formData.dni);
-                fd.append('password', formData.password);
+                fd.append('usuario', formData.usuario);
                 fd.append('nombre', formData.nombre);
-                fd.append('telefono', formData.telefono);
-                fd.append('direccion', formData.direccion);
-                fd.append('reg-nacimiento', formData.fecha_nac);
-                fd.append('email', formData.email);
-
-                const fileInputs = e.target.querySelectorAll('input[type="file"]');
-                fileInputs.forEach(input => {
-                    if (input.files[0]) fd.append(input.name, input.files[0]);
-                });
-
+                fd.append('password', formData.password);
+                
                 resp = await fetch(endpoint, {
                     method: 'POST',
                     body: fd
@@ -77,8 +82,13 @@ export default function AuthScreen({ onLogin }) {
                 if (isLogin) {
                     onLogin(data.usuario, data.token);
                 } else {
-                    setSuccess("¡Socio registrado! Ya podés ingresar.");
-                    setTimeout(() => setIsLogin(true), 2000);
+                    const nro = data.usuario.numero_de_socio;
+                    setSuccess(`¡Socio registrado! Tu número es: ${nro}. Anotalo para ingresar.`);
+                    setTimeout(() => {
+                        setIsLogin(true);
+                        setFormData(prev => ({ ...prev, socio: nro.toString() }));
+                        setSuccess(null);
+                    }, 5000);
                 }
             } else {
                 setError(data.error || "Error en el carnet");
@@ -109,11 +119,75 @@ export default function AuthScreen({ onLogin }) {
                     />
                 ))}
             </div>
+
             <div className="login-card card-retro">
+                {/* MODALES TIPO "OVERLAY INTERNO" - Mejorados estilo GitHub */}
+                {viewModal === 'reglamento' && (
+                    <div className="login-card-modal">
+                        <div className="modal-header-retro">
+                            <h2 style={{ fontSize: '1.2rem', margin: 0 }}>📜 REGLAMENTO</h2>
+                            <button className="btn-cerrar-retro" type="button" onClick={() => setViewModal(null)}>VOLVER</button>
+                        </div>
+                        <div className="modal-body-retro">
+                            <p style={{ fontWeight: 'bold', borderBottom: '1px solid #ccc', paddingBottom: '5px' }}>REGLAMENTO DEL JUEGO</p>
+                            <p>1. Marcá resultados de una fecha de primera división (Local, Empate o Visitante).</p>
+                            <p>2. Por partido se marca un solo resultado.</p>
+                            <p>3. La cantidad de partidos depende del fixture.</p>
+                            <p>4. Si un partido se suspende, la fecha no se cierra hasta tener el resultado final.</p>
+                            <p>5. Existen 4 niveles de acierto: Total, Total-1, Total-2 y Total-3.</p>
+                            <p>6. El recupero de fichas se muestra en el Pozo Acumulado.</p>
+                            <p>7. Podés jugar todas las boletas que desees.</p>
+                            <p>8. Cada boleta canjea 2.500 fichas (1 ficha del club).</p>
+                            <p>9. Siempre debe tener el mínimo de 2.500 fichas para jugar.</p>
+                            <p>10. No se permite llenar boletas de la fecha en curso.</p>
+                            <p>11. Se permiten boletas hasta 3 horas antes del primer partido.</p>
+                            <p>12. Se pueden llenar boletas de la próxima fecha si existe.</p>
+                            <p>13. El recupero de fichas es automático al finalizar los partidos.</p>
+                            <p>14. El canje se habilita al superar las 50.000 fichas.</p>
+                            <p>15. Al superar las 50.000 fichas se activa el botón de canje automático.</p>
+                            <p>16. Solo se canjean fichas obtenidas por aciertos.</p>
+                            <p>17. El canje es exclusivo para lo ganado en jugadas.</p>
+                            <p>18. Se muestra la cantidad de usuarios ganadores (sin nombres ni datos).</p>
+                            <p>19. El sistema notifica al usuario que acertó para su acreditación.</p>
+                            <p style={{ marginTop: '20px', fontStyle: 'italic', opacity: 0.7, textAlign: 'center' }}>"En el fútbol como en la vida, el que sabe, sabe."</p>
+                        </div>
+                    </div>
+                )}
+
+                {viewModal === 'comojugar' && (
+                    <div className="login-card-modal">
+                        <div className="modal-header-retro">
+                            <h2 style={{ fontSize: '1.2rem', margin: 0 }}>⚽ GUÍA DEL SOCIO</h2>
+                            <button className="btn-cerrar-retro" type="button" onClick={() => setViewModal(null)}>CERRAR</button>
+                        </div>
+                        <div className="modal-body-retro">
+                            <p style={{ textAlign: 'center', color: 'var(--color-primario)', fontWeight: 'bold' }}>¡Paso a paso para ser un experto!</p>
+                            <p><strong>1. CARNET:</strong> Ingresá con tu número de socio y contraseña para acceder al club.</p>
+                            <p><strong>2. LA BOLETA:</strong> Verás los partidos de la fecha. Marcá L (Local), E (Empate) o V (Visitante).</p>
+                            <p><strong>3. SELLADO:</strong> Revisa tu jugada y hacé clic en "JUEGA BOLETA". Cada una consume 2.500 fichas.</p>
+                            <p><strong>4. SEGUIMIENTO:</strong> Mirá en tiempo real cómo van tus aciertos durante el transcurso de la fecha.</p>
+                            <p><strong>5. PREMIOS:</strong> Si ganás, tus fichas se acreditan solas. Al llegar a 50.000 puntos, ¡activás el canje!</p>
+                            <div style={{ marginTop: '15px', padding: '10px', backgroundColor: '#eef', border: '1px dashed #99f', fontSize: '0.8rem' }}>
+                                💡 <strong>Dato clave:</strong> Podés jugar todas las boletas que quieras de la próxima fecha antes de que comience el primer partido.
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 <div className="login-logo-wrap">
                     <img src="/logo.png" alt="Sabes de Fútbol" className="login-logo" />
                 </div>
+                
                 <div className="boleta-numero" style={{ textAlign: 'center', marginBottom: '8px' }}>CARNET DE SOCIO</div>
+
+                {isLogin && (
+                    <div className="login-stats-box">
+                        <div className="stat-unica-linea">
+                            <span>SOCIOS REGISTRADOS:</span>
+                            <span className="stat-valor-destacado">{socioCount}</span>
+                        </div>
+                    </div>
+                )}
 
                 <div className="login-tabs">
                     <button
@@ -131,128 +205,72 @@ export default function AuthScreen({ onLogin }) {
                 </div>
 
                 {error && <p className="login-error">{error}</p>}
-                {success && <p className="login-error" style={{ color: 'var(--color-acento)' }}>{success}</p>}
+                {success && <p className="login-error" style={{ color: 'var(--color-acento)', backgroundColor: 'rgba(0,0,0,0.8)', padding: '10px', borderRadius: '5px' }}>{success}</p>}
 
-                {isLogin ? (
-                    <form className="login-form" onSubmit={handleSubmit}>
-                        <label>Nº de Documento</label>
-                        <input
-                            name="dni"
-                            type="text"
-                            placeholder="Ej: 12345678"
-                            required
-                            value={formData.dni}
-                            onChange={handleChange}
-                            disabled={loading}
-                        />
-                        <label>Contraseña</label>
-                        <input
-                            name="password"
-                            type="password"
-                            placeholder="Tu clave secreta"
-                            required
-                            value={formData.password}
-                            onChange={handleChange}
-                            disabled={loading}
-                        />
-                        <button type="submit" className="btn-jugar" disabled={loading}>
-                            {loading ? 'PROCESANDO...' : 'INGRESAR AL CLUB'}
-                        </button>
-                    </form>
-                ) : (
-                    <form className="login-form" onSubmit={handleSubmit}>
-                        <label>Nº de Documento *</label>
-                        <input name="dni" type="text" placeholder="Ej: 12345678" required value={formData.dni} onChange={handleChange} disabled={loading} />
-
-                        <label>Teléfono</label>
-                        <input name="telefono" type="tel" placeholder="Ej: 11 4321-8765" value={formData.telefono} onChange={handleChange} disabled={loading} />
-
-                        <label>Correo Electrónico</label>
-                        <input name="email" type="email" placeholder="ejemplo@correo.com" value={formData.email} onChange={handleChange} disabled={loading} />
-
-                        <label>Fecha de Nacimiento</label>
-                        <input name="fecha_nac" type="date" value={formData.fecha_nac} onChange={handleChange} disabled={loading} />
-
-                        <label>Nombre y Apellido *</label>
-                        <input name="nombre" type="text" placeholder="Juan Pérez" required value={formData.nombre} onChange={handleChange} disabled={loading} />
-
-                        <label>Dirección</label>
-                        <input name="direccion" type="text" placeholder="Calle, Nro, Provincia" value={formData.direccion} onChange={handleChange} disabled={loading} />
-
-                        <label>Contraseña *</label>
-                        <input name="password" type="password" placeholder="Elegí una clave" required value={formData.password} onChange={handleChange} disabled={loading} />
-                        
-                        <label>Confirmar Contraseña *</label>
-                        <input name="confirmPassword" type="password" placeholder="Repetí tu clave" required value={formData.confirmPassword} onChange={handleChange} disabled={loading} />
-
-                        <label>Foto DNI (Frente)</label>
-                        <input name="foto_dni_frente" type="file" accept="image/*" disabled={loading} />
-
-                        <label>Foto DNI (Dorso)</label>
-                        <input name="foto_dni_dorso" type="file" accept="image/*" disabled={loading} />
-
-                        <label>Foto Personal (Selfie)</label>
-                        <input name="foto_selfie" type="file" accept="image/*" disabled={loading} />
-
-                        <div className="terminos-contenedor">
-                            <div className="terminos-box">
-                                <h4 style={{ margin: '0 0 5px 0', fontSize: '10px', color: '#666' }}>TÉRMINOS Y CONDICIONES</h4>
-                                <p><strong>1. Aceptación del Acuerdo y Requisito de Edad</strong><br/>
-                                Estos Términos y Condiciones constituyen un acuerdo legal vinculante entre usted y el proveedor de la aplicación. <strong>Para poder crear una cuenta, acceder y utilizar esta aplicación, usted debe ser un adulto, es decir, haber alcanzado la mayoría de edad legal en su jurisdicción o país de residencia</strong> (al menos 18 años en la mayoría de los países de América Latina).</p>
-                                
-                                <p><strong>2. Licencia de Uso (La aplicación no se vende)</strong><br/>
-                                <strong>Esta aplicación y sus contenidos se le otorgan bajo licencia, no se le venden</strong>. Esto significa que usted no adquiere ningún derecho de propiedad sobre la aplicación ni sobre sus contenidos digitales.</p>
-                                
-                                <p>Bajo esta licencia, <strong>usted no puede</strong>:</p>
-                                <ul>
-                                    <li>Vender, alquilar, arrendar, redistribuir, ceder o sublicenciar la aplicación.</li>
-                                    <li>Realizar ingeniería inversa, descompilar, desensamblar, modificar o crear obras derivadas de la aplicación.</li>
-                                    <li>Utilizar la aplicación de manera que infrinja los derechos de propiedad intelectual de terceros.</li>
-                                </ul>
-
-                                <p><strong>3. Propiedad Intelectual</strong><br/>
-                                Nosotros poseemos y nos reservamos todos los derechos sobre la aplicación, incluyendo todo el código informático, diseños, gráficos, audios e interfaz.</p>
-
-                                <p><strong>4. Reglas de Conducta del Usuario</strong><br/>
-                                Esperamos que utilice la aplicación de manera legal y respetuosa. Nos reservamos el derecho de tomar medidas disciplinarias si usted participa en conductas prohibidas como actividades ilegales, fraude, acoso o uso de trampas (cheats).</p>
-
-                                <p><strong>5. Cancelación y Suspensión de la Cuenta</strong><br/>
-                                <strong>Podemos cancelar, suspender o limitar su acceso a la aplicación de manera inmediata si determinamos que ha incumplido estos Términos y Condiciones</strong>.</p>
-
-                                <p><strong>6. Renuncia de Garantías ("Tal Cual")</strong><br/>
-                                <strong>La aplicación se proporciona "tal cual" (as is) y "según disponibilidad"</strong>, sin garantías de ningún tipo.</p>
-
-                                <p><strong>7. Limitación de Responsabilidad</strong><br/>
-                                En la medida máxima permitida por las leyes aplicables, ni la empresa ni sus filiales serán responsables por daños indirectos, incidentales o consecuentes que surjan del uso o la imposibilidad de uso de la aplicación.</p>
-
-                                <p><strong>8. Privacidad y Uso de Datos</strong><br/>
-                                Al utilizar esta aplicación, usted acepta que recopilemos e información técnica y datos personales de acuerdo con nuestra <strong>Política de Privacidad</strong>.</p>
-
-                                <p><strong>9. Legislación Aplicable y Resolución de Disputas</strong><br/>
-                                Las leyes de su país de residencia en América Latina pueden otorgarle derechos irrenunciables. Estos Términos no pretenden excluir ninguno de esos derechos legales imperativos.</p>
-                            </div>
-                            <label className="terminos-aceptacion">
-                                <input 
-                                    type="checkbox" 
-                                    checked={aceptarTerminos} 
-                                    onChange={(e) => setAceptarTerminos(e.target.checked)}
-                                    disabled={loading}
-                                />
-                                Acepto los Términos y Condiciones de Uso
-                            </label>
-                        </div>
-
+                <form className="login-form" onSubmit={handleSubmit}>
+                    {isLogin ? (
+                        <>
+                            <label>Nº de Socio o Usuario</label>
+                            <input
+                                name="socio"
+                                type="text"
+                                placeholder="Ej: 1001"
+                                required
+                                value={formData.socio}
+                                onChange={handleChange}
+                                disabled={loading}
+                            />
+                            <label>Contraseña</label>
+                            <input
+                                name="password"
+                                type="password"
+                                placeholder="..."
+                                required
+                                value={formData.password}
+                                onChange={handleChange}
+                                disabled={loading}
+                            />
+                            <button type="submit" className="btn-jugar" disabled={loading}>
+                                {loading ? 'ESPERE...' : 'INGRESAR AL CLUB'}
+                            </button>
+                        </>
+                    ) : (
+                        <>
+                            <label>Usuario *</label>
+                            <input name="usuario" type="text" placeholder="Ej: juan_futbol" required value={formData.usuario} onChange={handleChange} disabled={loading} />
+                            <label>Nombre Completo *</label>
+                            <input name="nombre" type="text" placeholder="Juan Pérez" required value={formData.nombre} onChange={handleChange} disabled={loading} />
+                            <label>Contraseña *</label>
+                            <input name="password" type="password" required value={formData.password} onChange={handleChange} disabled={loading} />
+                            <label>Repetir Contraseña *</label>
+                            <input name="confirmPassword" type="password" required value={formData.confirmPassword} onChange={handleChange} disabled={loading} />
+                            <button type="submit" className="btn-jugar" disabled={loading}>
+                                {loading ? 'REGISTRANDO...' : 'OBTENER CARNET'}
+                            </button>
+                        </>
+                    )}
+                    
+                    {/* BOTONES DENTRO DEL CARNET */}
+                    <div className="login-card-footer">
                         <button 
-                            type="submit" 
-                            className="btn-jugar" 
-                            disabled={loading || !aceptarTerminos}
-                            style={{ opacity: (loading || !aceptarTerminos) ? 0.6 : 1 }}
+                            className="btn-retro-circle btn-reglamento-card" 
+                            type="button"
+                            onClick={() => setViewModal('reglamento')}
                         >
-                            {loading ? 'PROCESANDO...' : 'SELLAR REGISTRO'}
+                            📜 REGLAS
                         </button>
-                    </form>
-                )}
+                        <button 
+                            className="btn-retro-circle btn-comojugar-card" 
+                            type="button"
+                            onClick={() => setViewModal('comojugar')}
+                        >
+                            ⚽ GUÍA
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
     );
-}
+};
+
+export default AuthScreen;
