@@ -23,7 +23,7 @@ const AuthScreen = ({ onLogin }) => {
     useEffect(() => {
         const fetchStats = async () => {
             try {
-                const res = await fetch('/api/public_stats');
+                const res = await fetch('/api/stats-public');
                 if (res.ok) {
                     const data = await res.json();
                     setStats(data);
@@ -66,7 +66,7 @@ const AuthScreen = ({ onLogin }) => {
                 });
             } else {
                 const fd = new FormData();
-                fd.append('usuario', formData.usuario);
+                fd.append('nombre_de_usuario', formData.usuario);
                 fd.append('nombre', formData.nombre);
                 fd.append('password', formData.password);
                 

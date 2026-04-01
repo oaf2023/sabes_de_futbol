@@ -186,7 +186,6 @@ def login():
         'token': token,
         'usuario': usuario.to_dict()
     }), 200
-    return jsonify({'message': 'Login exitoso', 'usuario': usuario.to_dict(), 'token': token}), 200
 
 
 @app.route('/api/usuario/verificar-password', methods=['POST'])
