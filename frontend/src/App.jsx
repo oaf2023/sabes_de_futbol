@@ -57,8 +57,9 @@ function App() {
             clearInterval(poll);
             // Refrescar fichas del usuario
             const u = JSON.parse(sessionStorage.getItem('sabes_usuario') || '{}');
-            if (u.dni) {
-              const r2 = await fetchWithAuth(`/api/usuario/${u.dni}/fichas`);
+            const id = u.numero_de_socio || u.dni;
+            if (id) {
+              const r2 = await fetchWithAuth(`/api/usuario/${id}/fichas`);
               const d2 = await r2.json();
               if (r2.ok) setUsuario(prev => prev ? { ...prev, fichas: d2.fichas } : prev);
             }
@@ -78,7 +79,7 @@ function App() {
       fetchProximaFecha();
       actualizarFichas();
     }
-  }, [usuario?.dni]);
+  }, [usuario?.numero_de_socio, usuario?.dni]);
 
   // Cuando la fecha está en curso, actualizar jugadaActiva cada 60s
   useEffect(() => {
@@ -86,7 +87,7 @@ function App() {
     fetchJugadaActiva();
     const t = setInterval(fetchJugadaActiva, 60_000);
     return () => clearInterval(t);
-  }, [usuario?.dni, fechaComenzada]);
+  }, [usuario?.numero_de_socio, usuario?.dni, fechaComenzada]);
 
   const fetchPartidos = async () => {
     try {
@@ -133,7 +134,8 @@ function App() {
   const actualizarFichas = async () => {
     if (!usuario) return;
     try {
-      const resp = await fetchWithAuth(`/api/usuario/${usuario.dni}/fichas`);
+      const id = usuario.numero_de_socio || usuario.dni;
+      const resp = await fetchWithAuth(`/api/usuario/${id}/fichas`);
       const data = await resp.json();
       if (resp.ok) {
         setUsuario(prev => {
