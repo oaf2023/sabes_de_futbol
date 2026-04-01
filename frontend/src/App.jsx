@@ -134,8 +134,11 @@ function App() {
   const actualizarFichas = async () => {
     if (!usuario) return;
     try {
-      const id = usuario.numero_de_socio || usuario.dni;
-      const resp = await fetchWithAuth(`/api/usuario/${id}/fichas`);
+      // USAR SIEMPRE numero_de_socio para la URL de la API
+      const idSocio = usuario.numero_de_socio;
+      if (!idSocio) return;
+
+      const resp = await fetchWithAuth(`/api/usuario/${idSocio}/fichas`);
       const data = await resp.json();
       if (resp.ok) {
         setUsuario(prev => {
