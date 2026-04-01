@@ -21,22 +21,33 @@ db = SQLAlchemy()
 class Usuario(db.Model):
     __tablename__ = 'usuarios'
 
-    dni         = db.Column(db.String(20), primary_key=True)
-    telefono    = db.Column(db.String(30), nullable=False)
+    # Identificador principal según nuevo requerimiento de número de socio
+    id              = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    numero_de_socio = db.Column(db.Integer, unique=True, index=True)
+    nombre_de_usuario = db.Column(db.String(50), unique=True, nullable=True) # Para login ligero
+    
+    dni         = db.Column(db.String(20), nullable=True) # Deja de ser PK y ya no es UNIQUE
+    telefono    = db.Column(db.String(30), nullable=True) # Flexibilizado
     email       = db.Column(db.String(120), nullable=True)
-    direccion   = db.Column(db.String(200), nullable=False)
+    direccion   = db.Column(db.String(200), nullable=True) # Flexibilizado
     nombre      = db.Column(db.String(100), nullable=True)
-    fecha_nac   = db.Column(db.String(20), nullable=False)
+    fecha_nac   = db.Column(db.String(20), nullable=True) # Flexibilizado
     password_hash = db.Column(db.String(256), nullable=False)
     foto_dni_frente = db.Column(db.String(300), nullable=True)
     foto_dni_dorso  = db.Column(db.String(300), nullable=True)
     foto_selfie     = db.Column(db.String(300), nullable=True)
     fecha_registro  = db.Column(db.DateTime, default=datetime.utcnow)
-    fichas          = db.Column(db.Integer, default=0) # Nuevo: Sistema de fichas
+    
+    # Nuevos campos de fichas según cambios.md
+    fichas          = db.Column(db.Integer, default=0) # Saldo total
+    fichas_compradas = db.Column(db.Integer, default=0)
+    fichas_ganadas   = db.Column(db.Integer, default=0)
+    
     pais_id         = db.Column(db.Integer, db.ForeignKey('paises.id'), default=1) # Nuevo: País del usuario (1=Arg)
     completado      = db.Column(db.String(2), default='NO') # Nuevo: 'SI' o 'NO'
 
-    jugadas = db.relationship('JugadaUsuario', backref='usuario', lazy=True)
+    # Relación con jugadas especificando la llave foránea principal (usuario_id)
+    jugadas = db.relationship('JugadaUsuario', backref='usuario', lazy=True, foreign_keys='JugadaUsuario.usuario_id')
 
     def set_password(self, raw_password):
         self.password_hash = generate_password_hash(raw_password)
@@ -46,6 +57,9 @@ class Usuario(db.Model):
 
     def to_dict(self):
         return {
+            'id': self.id,
+            'numero_de_socio': self.numero_de_socio,
+            'nombre_de_usuario': self.nombre_de_usuario,
             'dni': self.dni,
             'telefono': self.telefono,
             'email': self.email,
@@ -54,6 +68,8 @@ class Usuario(db.Model):
             'fecha_nac': self.fecha_nac,
             'foto_selfie': self.foto_selfie,
             'fichas': self.fichas,
+            'fichas_compradas': self.fichas_compradas,
+            'fichas_ganadas': self.fichas_ganadas,
             'completado': self.completado,
             'fecha_registro': self.fecha_registro.isoformat() if self.fecha_registro else None
         }
@@ -115,7 +131,8 @@ class JugadaUsuario(db.Model):
     __tablename__ = 'jugadas_usuario'
 
     id              = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    usuario_dni     = db.Column(db.String(20), db.ForeignKey('usuarios.dni'), nullable=False)
+    usuario_id      = db.Column(db.Integer, db.ForeignKey('usuarios.id'), nullable=True) # Nueva FK
+    usuario_dni     = db.Column(db.String(20), db.ForeignKey('usuarios.dni'), nullable=True) # Legacy
     nro_fecha       = db.Column(db.Integer, nullable=False)  # columna legacy NOT NULL en la DB
     fecha_sorteo_id = db.Column(db.Integer, db.ForeignKey('fechas_sorteo.id'), nullable=True)
     jugada_binaria  = db.Column(db.String(500), nullable=False) # Aumentado para más partidos
@@ -124,9 +141,12 @@ class JugadaUsuario(db.Model):
     fecha_registro  = db.Column(db.DateTime, default=datetime.utcnow)
 
     def to_dict(self):
+        usuario = self.usuario
         return {
             'id': self.id,
+            'usuario_id': self.usuario_id,
             'usuario_dni': self.usuario_dni,
+            'numero_de_socio': usuario.numero_de_socio if usuario else None,
             'fecha_sorteo_id': self.fecha_sorteo_id,
             'jugada': self.jugada_binaria,
             'aciertos': self.aciertos,

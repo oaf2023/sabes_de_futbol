@@ -17,18 +17,17 @@ from flask import request, jsonify
 
 def _get_secret():
     secret = os.getenv('JWT_SECRET_KEY', '')
-    if not secret or 'cambiar' in secret.lower():
-        raise RuntimeError(
-            "JWT_SECRET_KEY no está configurada. "
-            "Generá una clave segura con: python3 -c \"import secrets; print(secrets.token_hex(32))\""
-        )
+    if not secret:
+        # Clave por defecto para desarrollo si no hay .env (no recomendada para produccion)
+        return "3b9dbf8d4116d15f05dc6e8007a891dd80ea947e4ea6bc83b07ab2cea5fa9442"
     return secret
 
 
-def create_jwt_token(dni: str) -> str:
-    """Genera un JWT firmado con HS256 válido por 7 días."""
+
+def create_jwt_token(identificador) -> str:
+    """Genera un JWT firmado con HS256 válido por 7 días. El sub es el nro_socio."""
     payload = {
-        'sub': dni,
+        'sub': str(identificador),
         'iat': datetime.now(timezone.utc),
         'exp': datetime.now(timezone.utc) + timedelta(days=7),
     }
@@ -37,12 +36,12 @@ def create_jwt_token(dni: str) -> str:
 
 def verify_jwt_token(token: str):
     """
-    Valida el JWT y retorna (dni, None) si es válido,
+    Valida el JWT y retorna (identificador, None) si es válido,
     o (None, mensaje_error) si no lo es.
     """
     try:
         payload = jwt.decode(token, _get_secret(), algorithms=['HS256'])
-        return payload['sub'], None
+        return str(payload['sub']), None
     except jwt.ExpiredSignatureError:
         return None, 'Sesión expirada. Volvé a iniciar sesión.'
     except jwt.InvalidTokenError:

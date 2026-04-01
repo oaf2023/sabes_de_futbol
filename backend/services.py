@@ -48,12 +48,50 @@ def ejecutar_tarea_concurrente(app, func, *args):
 
 class UserService:
     @staticmethod
-    def registrar_usuario(datos, fotos):
+    def buscar_usuario(identificador):
+        """Busca un usuario por número de socio, DNI, id interno o nombre de usuario."""
+        if not identificador: return None
+        
+        # 1. Intentar por número de socio si es numérico
+        if str(identificador).isdigit():
+            u = Usuario.query.filter_by(numero_de_socio=int(identificador)).first()
+            if u: return u
+            
+            # 2. Intentar por id interno
+            u = Usuario.query.get(identificador)
+            if u: return u
+            
+            # 3. Intentar por DNI
+            u = Usuario.query.filter_by(dni=str(identificador)).first()
+            if u: return u
+        
+        # 4. Intentar por nombre de usuario
+        return Usuario.query.filter_by(nombre_de_usuario=identificador).first()
+
+    @staticmethod
+    def _generar_numero_socio():
+        """Genera el siguiente número de socio correlativo."""
+        ultimo = Usuario.query.order_by(Usuario.numero_de_socio.desc()).first()
+        if not ultimo or not ultimo.numero_de_socio:
+            return 1000  # Empezamos en 1000 por estética
+        return ultimo.numero_de_socio + 1
+
+    @staticmethod
+    def registrar_usuario(datos, fotos=None):
+        if not fotos: fotos = {}
+        
+        nombre_usuario = datos.get('nombre_de_usuario')
+        if not nombre_usuario:
+            return None, "El nombre de usuario es obligatorio", 400
+            
+        if Usuario.query.filter_by(nombre_de_usuario=nombre_usuario).first():
+            return None, "Ese nombre de usuario ya está en uso", 409
+
         dni = datos.get('dni')
-        if Usuario.query.get(dni):
+        if dni and Usuario.query.filter_by(dni=dni).first():
             return None, "Ese DNI ya está registrado", 409
 
-        # Determinar si el perfil está completo
+        # Determinar si el perfil está completo (para canjes futuros)
         campos_completos = all([
             datos.get('dni'),
             datos.get('telefono'),
@@ -66,12 +104,14 @@ class UserService:
         ])
         
         usuario = Usuario(
-            dni=dni,
-            telefono=datos.get('telefono'),
+            numero_de_socio=UserService._generar_numero_socio(),
+            nombre_de_usuario=nombre_usuario,
+            dni=dni or None,
+            telefono=datos.get('telefono') or None,
             email=datos.get('email') or None,
-            direccion=datos.get('direccion'),
-            nombre=datos.get('nombre'),
-            fecha_nac=datos.get('fecha_nac'),
+            direccion=datos.get('direccion') or None,
+            nombre=datos.get('nombre') or None,
+            fecha_nac=datos.get('fecha_nac') or None,
             foto_dni_frente=fotos.get('foto_dni_frente'),
             foto_dni_dorso=fotos.get('foto_dni_dorso'),
             foto_selfie=fotos.get('foto_selfie'),
@@ -83,8 +123,11 @@ class UserService:
         return usuario, None, 201
 
     @staticmethod
-    def actualizar_usuario(dni, datos, fotos):
-        usuario = Usuario.query.get(dni)
+    def actualizar_usuario(identificador, datos, fotos=None):
+        if not fotos: fotos = {}
+        # El identificador puede ser número de socio, DNI o nombre de usuario
+        usuario = UserService.buscar_usuario(identificador)
+            
         if not usuario: return None, "Usuario no encontrado", 404
         
         # Actualizar campos básicos
@@ -93,6 +136,7 @@ class UserService:
         if 'nombre' in datos: usuario.nombre = datos.get('nombre')
         if 'fecha_nac' in datos: usuario.fecha_nac = datos.get('fecha_nac')
         if 'email' in datos: usuario.email = datos.get('email')
+        if 'dni' in datos: usuario.dni = datos.get('dni')
         
         # Actualizar fotos si se proveen
         if fotos.get('foto_dni_frente'): usuario.foto_dni_frente = fotos.get('foto_dni_frente')
@@ -116,10 +160,12 @@ class UserService:
         return usuario, None, 200
 
     @staticmethod
-    def login(dni, password):
-        usuario = Usuario.query.get(dni)
+    def login(identificador, password):
+        """Login por número de socio, DNI o nombre de usuario."""
+        usuario = UserService.buscar_usuario(identificador)
+            
         if not usuario or not usuario.check_password(password):
-            return None, "DNI o contraseña incorrectos", 401
+            return None, "Usuario o contraseña incorrectos", 401
         return usuario, None, 200
 
 class GameService:
@@ -140,8 +186,10 @@ class GameService:
         return fecha_activa, None, 200
 
     @staticmethod
-    def guardar_jugadas(dni, jugadas_raw, fecha_sorteo_id=None):
-        usuario = Usuario.query.get(dni)
+    def guardar_jugadas(identificador, jugadas_raw, fecha_sorteo_id=None):
+        # El identificador es el número de socio (o DNI en tokens viejos)
+        usuario = UserService.buscar_usuario(identificador)
+
         if not usuario:
             return None, "Usuario no encontrado", 404
 
@@ -166,6 +214,26 @@ class GameService:
         else:
             control = FechaActual.query.filter_by(activo=True).first()
             fecha_activa = FechaSorteo.query.filter_by(nro_fecha=control.nro_fecha, pais_id=control.pais_id).first() if control else None
+
+        if not fecha_activa:
+            return None, "No hay fecha activa para jugar actualmente", 404
+
+        # Guardar cada jugada
+        for j_raw in jugadas_raw:
+            j_bin = codificar_jugada(j_raw)
+            nueva = JugadaUsuario(
+                usuario_id=usuario.id,
+                usuario_dni=str(usuario.dni or usuario.numero_de_socio), # Legacy
+                nro_fecha=fecha_activa.nro_fecha,
+                fecha_sorteo_id=fecha_activa.id,
+                jugada_binaria=j_bin,
+                monto_apostado=1
+            )
+            db.session.add(nueva)
+            usuario.fichas -= 1
+
+        db.session.commit()
+        return {'message': f'Se guardaron {len(jugadas_raw)} jugadas correctamente', 'fichas_restantes': usuario.fichas}, None, 201
 
             if not fecha_activa:
                 return None, "No hay una fecha activa válida", 404
@@ -250,9 +318,14 @@ class GameService:
 
 class PaymentService:
     @staticmethod
-    def registrar_intento_pago(dni, cantidad_fichas, p_monto, pasarela_nombre, external_id):
+    def registrar_intento_pago(identificador, cantidad_fichas, p_monto, pasarela_nombre, external_id):
+        # El identificador puede ser número de socio, DNI o id externo
+        usuario = UserService.buscar_usuario(identificador)
+        if not usuario: return None
+
         pago = PagoFichas(
-            usuario_dni=dni,
+            usuario_id=usuario.id,
+            usuario_dni=str(usuario.dni or usuario.numero_de_socio), # legacy
             pasarela=pasarela_nombre,
             external_id=external_id,
             paquete=f'libre_{cantidad_fichas}',
@@ -265,8 +338,9 @@ class PaymentService:
         return pago
 
     @staticmethod
-    def crear_preferencia_mercadopago(dni, cantidad_fichas):
-        usuario = Usuario.query.get(dni)
+    def crear_preferencia_mercadopago(identificador, cantidad_fichas):
+        # El identificador puede ser número de socio, DNI o nombre de usuario
+        usuario = UserService.buscar_usuario(identificador)
         if not usuario:
             return None, "Usuario no encontrado", 404
 
@@ -281,7 +355,7 @@ class PaymentService:
             # Fallback manual si no hay token
             static_url = "https://link.mercadopago.com.ar/sabesdefutbol"
             PaymentService.registrar_intento_pago(
-                dni, cantidad_fichas, monto,
+                identificador, cantidad_fichas, monto,
                 'mercadopago_manual', f'manual_{int(ahora_ar().timestamp())}'
             )
             return {'checkout_url': static_url, 'modo': 'manual'}, None, 200
@@ -349,7 +423,15 @@ class PaymentService:
             if not pago:
                 return {'status': 'already_processed_or_not_found'}, None, 200
 
-            usuario = Usuario.query.get(pago.usuario_dni)
+            # El usuario_dni en PagoFichas es el DNI del usuario (puesto que se vinculaba así antes)
+            # Buscamos al usuario por ese DNI
+            usuario = Usuario.query.filter_by(dni=pago.usuario_dni).first()
+            
+            if not usuario:
+                # Si no lo encontramos por DNI, intentamos por nro de socio (por si quedó ahí)
+                if str(pago.usuario_dni).isdigit():
+                    usuario = Usuario.query.filter_by(numero_de_socio=int(pago.usuario_dni)).first()
+
             if usuario:
                 usuario.fichas += pago.fichas
                 pago.estado = 'aprobado'

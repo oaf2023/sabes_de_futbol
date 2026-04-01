@@ -101,53 +101,91 @@ def is_valid_image(file_storage):
             return True
     return False
 
-def sanitize_dni(dni):
-    """Acepta solo dígitos en el DNI."""
-    return ''.join(c for c in (dni or '') if c.isdigit())
+def sanitize_identificador(ident):
+    """Limpia el identificador de usuario (puede ser nro de socio o nombre)."""
+    if not ident: return ""
+    return str(ident).strip()
 
-def save_upload(file, dni, campo):
+def save_upload(file, identificador, campo):
     if file and allowed_file(file.filename):
         if not is_valid_image(file):
             return None  # Rechaza archivos que no son imágenes reales
         ext = file.filename.rsplit('.', 1)[1].lower()
-        safe_dni = sanitize_dni(dni)
-        if not safe_dni:
+        # Usamos el identificador (nombre o nro de socio) para la carpeta
+        safe_id = "".join(c for c in str(identificador) if c.isalnum())
+        if not safe_id:
             return None
-        dest_dir = os.path.join(app.config['UPLOAD_FOLDER'], safe_dni)
+        dest_dir = os.path.join(app.config['UPLOAD_FOLDER'], safe_id)
         os.makedirs(dest_dir, exist_ok=True)
         filename = f"{campo}.{ext}"
         path = os.path.join(dest_dir, filename)
         file.save(path)
-        return f"uploads/{safe_dni}/{filename}"
+        return f"uploads/{safe_id}/{filename}"
     return None
+
+# ---------------------------------------------------------------------------
+# Stats Públicas (Login)
+# ---------------------------------------------------------------------------
+@app.route('/api/stats-public', methods=['GET'])
+def stats_publicas():
+    total_socios = Usuario.query.count()
+    ultimo_socio = db.session.query(db.func.max(Usuario.numero_de_socio)).scalar() or 0
+    return jsonify({
+        'total_socios': total_socios + 1000,
+        'ultimo_socio': ultimo_socio if ultimo_socio > 0 else 1000
+    }), 200
 
 # ---------------------------------------------------------------------------
 # Endpoints Auth
 # ---------------------------------------------------------------------------
 @app.route('/api/register', methods=['POST'])
-@limiter.limit("3 per minute")
+@limiter.limit("5 per minute")
 def register():
-    dni = sanitize_dni(request.form.get('dni', ''))
-    if not dni:
-        return jsonify({'error': 'DNI es obligatorio y debe contener solo números'}), 400
+    # El registro ahora es "ligero" (nombre de usuario y password)
+    nombre_usuario = request.form.get('nombre_de_usuario')
+    if not nombre_usuario:
+        return jsonify({'error': 'Nombre de usuario es obligatorio'}), 400
 
+    dni = request.form.get('dni', '')
+    
     fotos = {}
+    # Solo procesamos fotos si se envían (ahora opcionales en registro inicial)
     for campo in ['foto_dni_frente', 'foto_dni_dorso', 'foto_selfie']:
         archivo = request.files.get(campo)
-        fotos[campo] = save_upload(archivo, dni, campo)
+        if archivo:
+            # Usamos el nombre de usuario para la carpeta de uploads inicial
+            fotos[campo] = save_upload(archivo, nombre_usuario, campo)
 
     usuario, error, code = UserService.registrar_usuario(request.form, fotos)
     if error: return jsonify({'error': error}), code
-    return jsonify({'message': 'Registro exitoso', 'usuario': usuario.to_dict()}), 201
+    
+    # Generamos token para loguear automáticamente tras registro
+    token = create_jwt_token(usuario.numero_de_socio)
+    return jsonify({
+        'message': 'Registro exitoso', 
+        'usuario': usuario.to_dict(),
+        'token': token
+    }), 201
 
 
 @app.route('/api/login', methods=['POST'])
-@limiter.limit("5 per minute")
+@limiter.limit("10 per minute")
 def login():
     data = request.get_json(silent=True) or {}
-    usuario, error, code = UserService.login(data.get('dni', ''), data.get('password', ''))
+    identificador = data.get('socio') or data.get('usuario') or data.get('dni')
+    
+    if not identificador:
+        return jsonify({'error': 'Número de socio o usuario requerido'}), 400
+        
+    usuario, error, code = UserService.login(identificador, data.get('password', ''))
     if error: return jsonify({'error': error}), code
-    token = create_jwt_token(usuario.dni)
+    
+    # El token ahora se basa en el numero_de_socio
+    token = create_jwt_token(usuario.numero_de_socio)
+    return jsonify({
+        'token': token,
+        'usuario': usuario.to_dict()
+    }), 200
     return jsonify({'message': 'Login exitoso', 'usuario': usuario.to_dict(), 'token': token}), 200
 
 
@@ -166,18 +204,18 @@ def verificar_password():
 @app.route('/api/usuario/actualizar', methods=['POST'])
 @require_auth
 def actualizar_socio():
-    # DNI viene del JWT — ignora cualquier DNI en el body
-    dni = request.current_user_dni
+    # El identificador del JWT es el número de socio
+    socio_nro = str(request.current_user_dni)
 
     fotos = {}
     for campo in ['foto_dni_frente', 'foto_dni_dorso', 'foto_selfie']:
         archivo = request.files.get(campo)
         if archivo:
-            fotos[campo] = save_upload(archivo, dni, campo)
+            fotos[campo] = save_upload(archivo, socio_nro, campo)
         else:
             fotos[campo] = None
 
-    usuario, error, code = UserService.actualizar_usuario(dni, request.form, fotos)
+    usuario, error, code = UserService.actualizar_usuario(socio_nro, request.form, fotos)
     if error: return jsonify({'error': error}), code
     return jsonify({'message': 'Perfil actualizado', 'usuario': usuario.to_dict()}), 200
 
@@ -270,8 +308,9 @@ def guardar_jugada():
         jugadas = [data['selecciones']]
     fecha_sorteo_id = data.get('fecha_sorteo_id')  # opcional, para próxima fecha
 
-    # DNI viene del JWT
-    res, error, code = GameService.guardar_jugadas(request.current_user_dni, jugadas, fecha_sorteo_id)
+    # El identificador del JWT es el número de socio
+    socio_nro = request.current_user_dni
+    res, error, code = GameService.guardar_jugadas(socio_nro, jugadas, fecha_sorteo_id)
     if error: return jsonify({'error': error}), code
     return jsonify(res), 201
 
@@ -327,14 +366,22 @@ def obtener_detalle_jugada(jugada_id):
     }), 200
 
 
-@app.route('/api/historial/<dni>', methods=['GET'])
+@app.route('/api/historial/<dni_or_socio>', methods=['GET'])
 @require_auth
-def historial(dni):
+def historial(dni_or_socio):
     # Solo el propio usuario puede ver su historial
-    if request.current_user_dni != dni:
+    if str(request.current_user_dni) != str(dni_or_socio):
         return jsonify({'error': 'Acceso denegado'}), 403
 
-    jugadas = JugadaUsuario.query.filter_by(usuario_dni=dni).order_by(JugadaUsuario.fecha_registro.desc()).all()
+    # Buscar por cualquier identificador
+    usuario = UserService.buscar_usuario(dni_or_socio)
+
+    if not usuario:
+        return jsonify({'error': 'Usuario no encontrado'}), 404
+
+    jugadas = (JugadaUsuario.query
+               .filter_by(usuario_id=usuario.id)
+               .order_by(JugadaUsuario.fecha_registro.desc()).all())
     res = []
     for j in jugadas:
         f = FechaSorteo.query.get(j.fecha_sorteo_id)
@@ -355,7 +402,12 @@ def mi_jugada_activa():
     y un flag 'acierto' (True/False/None) para renderizar el fibrón verde/naranja.
     También devuelve estadísticas parciales cuando la fecha está en curso.
     """
-    dni = request.current_user_dni
+    socio_nro = request.current_user_dni
+    usuario = UserService.buscar_usuario(socio_nro)
+    
+    if not usuario:
+        return jsonify({'error': 'Usuario no encontrado'}), 404
+
     control = FechaActual.query.filter_by(activo=True).first()
     if not control:
         return jsonify({'jugada': None, 'motivo': 'sin_fecha_activa'}), 200
@@ -368,7 +420,7 @@ def mi_jugada_activa():
         return jsonify({'jugada': None, 'motivo': 'sin_fixture'}), 200
 
     jugada = (JugadaUsuario.query
-              .filter_by(usuario_dni=dni, fecha_sorteo_id=fecha.id)
+              .filter_by(usuario_id=usuario.id, fecha_sorteo_id=fecha.id)
               .order_by(JugadaUsuario.fecha_registro.desc())
               .first())
     if not jugada:
@@ -430,14 +482,14 @@ def mi_jugada_activa():
 # ---------------------------------------------------------------------------
 # Pagos
 # ---------------------------------------------------------------------------
-@app.route('/api/usuario/<dni>/fichas', methods=['GET'])
+@app.route('/api/usuario/<identificador>/fichas', methods=['GET'])
 @require_auth
-def gestionar_fichas(dni):
+def gestionar_fichas(identificador):
     # Solo el propio usuario puede ver sus fichas
-    if request.current_user_dni != dni:
+    if str(request.current_user_dni) != str(identificador):
         return jsonify({'error': 'Acceso denegado'}), 403
 
-    u = Usuario.query.get(dni)
+    u = UserService.buscar_usuario(identificador)
     if not u: return jsonify({'error': 'No existe'}), 404
     return jsonify({'fichas': u.fichas}), 200
 
@@ -445,8 +497,9 @@ def gestionar_fichas(dni):
 @app.route('/api/usuario/estado-ultimo-pago', methods=['GET'])
 @require_auth
 def estado_ultimo_pago():
+    socio_nro = str(request.current_user_dni)
     pago = PagoFichas.query.filter_by(
-        usuario_dni=request.current_user_dni
+        usuario_dni=socio_nro
     ).order_by(PagoFichas.fecha_creacion.desc()).first()
     if not pago:
         return jsonify({'estado': None}), 200
@@ -484,12 +537,13 @@ def iniciar_pago():
     if cantidad < 1:
         return jsonify({'error': 'La cantidad mínima es 1 ficha'}), 400
 
-    # DNI viene del JWT
-    res, error, code = PaymentService.crear_preferencia_mercadopago(request.current_user_dni, cantidad)
+    # Identificador viene del JWT (Socio)
+    socio_nro = str(request.current_user_dni)
+    res, error, code = PaymentService.crear_preferencia_mercadopago(socio_nro, cantidad)
     if error: return jsonify({'error': error}), code
     # Devolver también el id del registro de pago para que el frontend haga polling preciso
     pago = PagoFichas.query.filter_by(
-        usuario_dni=request.current_user_dni
+        usuario_dni=socio_nro
     ).order_by(PagoFichas.fecha_creacion.desc()).first()
     if pago:
         res['pago_id'] = pago.id
@@ -715,30 +769,39 @@ def admin_socios():
     filtro = request.args.get('q', '').strip()
     q = Usuario.query
     if filtro:
+        filtro_like = f'%{filtro}%'
         q = q.filter(
-            db.or_(Usuario.dni.like(f'%{filtro}%'), Usuario.nombre.like(f'%{filtro}%'))
+            db.or_(
+                Usuario.numero_de_socio.like(filtro_like),
+                Usuario.nombre_de_usuario.like(filtro_like),
+                Usuario.nombre.like(filtro_like),
+                Usuario.dni.like(filtro_like)
+            )
         )
     socios = q.order_by(Usuario.fecha_registro.desc()).limit(200).all()
     return jsonify([u.to_dict() for u in socios]), 200
 
 
-@app.route('/api/admin/socio/<dni>', methods=['GET'])
+@app.route('/api/admin/socio/<identificador>', methods=['GET'])
 @require_admin
-def admin_get_socio(dni):
-    u = Usuario.query.get(dni)
+def admin_get_socio(identificador):
+    u = UserService.buscar_usuario(identificador)
     if not u:
         return jsonify({'error': 'No encontrado'}), 404
     return jsonify(u.to_dict()), 200
 
 
-@app.route('/api/admin/socio/<dni>', methods=['POST'])
+@app.route('/api/admin/socio/<identificador>', methods=['POST'])
 @require_admin
-def admin_update_socio(dni):
-    u = Usuario.query.get(dni)
+def admin_update_socio(identificador):
+    u = UserService.buscar_usuario(identificador)
     if not u:
         return jsonify({'error': 'No encontrado'}), 404
     data = request.get_json(silent=True) or {}
     if 'nombre'    in data: u.nombre    = data['nombre']
+    if 'nombre_de_usuario' in data: u.nombre_de_usuario = data['nombre_de_usuario']
+    if 'numero_de_socio' in data: u.numero_de_socio = data['numero_de_socio']
+    if 'dni'       in data: u.dni       = data['dni']
     if 'email'     in data: u.email     = data['email']
     if 'telefono'  in data: u.telefono  = data['telefono']
     if 'fichas'    in data: u.fichas    = int(data['fichas'])
@@ -799,17 +862,20 @@ def admin_migrar_pagos_fichas():
 @require_admin
 def admin_acreditar_fichas():
     data   = request.get_json(silent=True) or {}
-    dni    = data.get('dni')
+    identificador = data.get('usuario_id') or data.get('dni')
     cant   = data.get('cantidad', 0)
     motivo = data.get('motivo', 'admin_manual')
-    if not dni or cant <= 0:
-        return jsonify({'error': 'dni y cantidad requeridos'}), 400
-    u = Usuario.query.get(dni)
+    if not identificador or cant <= 0:
+        return jsonify({'error': 'usuario_id/dni y cantidad requeridos'}), 400
+    
+    u = UserService.buscar_usuario(identificador)
+    
     if not u:
         return jsonify({'error': 'Socio no encontrado'}), 404
+    
     u.fichas += cant
     db.session.add(PagoFichas(
-        usuario_dni=dni, pasarela='admin_manual',
+        usuario_dni=str(u.dni or u.numero_de_socio), pasarela='admin_manual',
         paquete=f'manual_{motivo}', fichas=cant, monto=0,
         estado='aprobado', fecha_resolucion=db.func.now()
     ))

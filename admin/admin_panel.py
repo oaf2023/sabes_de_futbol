@@ -164,7 +164,8 @@ if seccion == "📊 Dashboard":
         st.subheader("Últimos socios registrados")
         for s in data.get('ultimos_socios', []):
             tag = '<span class="tag-si">COMPLETO</span>' if s.get('completado') == 'SI' else '<span class="tag-no">INCOMPLETO</span>'
-            st.markdown(f"**{s.get('nombre') or '—'}** `{s['dni']}` {tag}", unsafe_allow_html=True)
+            identificador = s.get('numero_de_socio') or s.get('nombre_de_usuario') or s.get('id')
+            st.markdown(f"**{s.get('nombre') or '—'}** `Socio: {identificador}` {tag}", unsafe_allow_html=True)
 
     with col_b:
         st.subheader("Fecha activa por país")
@@ -454,7 +455,7 @@ elif seccion == "👥 Socios":
 
     with tab1:
         st.subheader("Listado de socios")
-        filtro = st.text_input("Buscar por DNI o nombre")
+        filtro = st.text_input("Buscar por Socio, Usuario o Nombre")
         socios, err = api_get('/api/admin/socios', {'q': filtro} if filtro else None)
         if err:
             st.error(err)
@@ -462,30 +463,46 @@ elif seccion == "👥 Socios":
             st.caption(f"{len(socios)} socios encontrados")
             import pandas as pd
             if socios:
-                st.dataframe(pd.DataFrame(socios), use_container_width=True)
+                cols_display = ['id', 'numero_de_socio', 'nombre_de_usuario', 'nombre', 'dni', 'fichas', 'completado', 'fecha_registro']
+                df_socios = pd.DataFrame(socios)
+                cols_exist = [c for c in cols_display if c in df_socios.columns]
+                st.dataframe(df_socios[cols_exist], use_container_width=True)
 
     with tab2:
         st.subheader("Editar datos de un socio")
-        dni_edit = st.text_input("DNI del socio a editar")
-        if dni_edit:
-            socio, err = api_get(f'/api/admin/socio/{dni_edit}')
+        id_edit = st.text_input("ID o Número de Socio a editar")
+        if id_edit:
+            socio, err = api_get(f'/api/admin/socio/{id_edit}')
             if err:
-                st.error("Socio no encontrado.")
+                st.error("Socio no encontrado. Recordá que ahora usamos ID o Número de Socio.")
             else:
                 with st.form("form_socio"):
-                    nombre   = st.text_input("Nombre",    value=socio.get('nombre') or '')
+                    col_u1, col_u2 = st.columns(2)
+                    with col_u1:
+                        nombre_user = st.text_input("Usuario", value=socio.get('nombre_de_usuario') or '')
+                        nro_socio   = st.number_input("Nº Socio", value=int(socio.get('numero_de_socio') or 0))
+                    with col_u2:
+                        nombre   = st.text_input("Nombre Real", value=socio.get('nombre') or '')
+                        dni      = st.text_input("DNI", value=socio.get('dni') or '')
+                    
                     email    = st.text_input("Email",     value=socio.get('email') or '')
                     telefono = st.text_input("Teléfono",  value=socio.get('telefono') or '')
                     fichas   = st.number_input("Fichas",  min_value=0, value=int(socio.get('fichas') or 0))
                     completo = st.selectbox("Completado", ["SI", "NO"],
                                             index=0 if socio.get('completado') == 'SI' else 1)
                     nueva_pass = st.text_input("Nueva contraseña (dejar vacío para no cambiar)", type="password")
+                    
                     if st.form_submit_button("💾 Guardar cambios"):
-                        body = {'nombre': nombre, 'email': email, 'telefono': telefono,
-                                'fichas': fichas, 'completado': completo}
+                        body = {
+                            'nombre': nombre, 'email': email, 'telefono': telefono,
+                            'fichas': fichas, 'completado': completo,
+                            'nombre_de_usuario': nombre_user,
+                            'numero_de_socio': nro_socio,
+                            'dni': dni
+                        }
                         if nueva_pass.strip():
                             body['nueva_password'] = nueva_pass.strip()
-                        _, err = api_post(f'/api/admin/socio/{dni_edit}', body)
+                        _, err = api_post(f'/api/admin/socio/{id_edit}', body)
                         if err:
                             st.error(err)
                         else:
@@ -503,18 +520,18 @@ elif seccion == "🪙 Fichas":
         st.subheader("Acreditar fichas manualmente")
         col1, col2 = st.columns(2)
         with col1:
-            dni_fichas = st.text_input("DNI del socio")
+            id_fichas = st.text_input("ID o Nº Socio")
         with col2:
             cant = st.number_input("Fichas a acreditar", min_value=1, max_value=500, value=5)
-        motivo = st.selectbox("Motivo", ["Pago confirmado", "Bonificación", "Corrección", "Premio", "Otro"])
+        motivo = st.selectbox("Motivo", ["Pago confirmado", "Bonus Registro", "Premio", "Corrección", "Otro"])
         nota   = st.text_input("Nota adicional (opcional)")
 
         if st.button("🪙 ACREDITAR FICHAS", use_container_width=True):
-            if not dni_fichas:
-                st.error("Ingresá un DNI.")
+            if not id_fichas:
+                st.error("Ingresá un ID o Nº de Socio.")
             else:
                 res, err = api_post('/api/admin/acreditar-fichas', {
-                    'dni': dni_fichas, 'cantidad': cant, 'motivo': f'{motivo} {nota}'.strip()
+                    'usuario_id': id_fichas, 'cantidad': cant, 'motivo': f'{motivo} {nota}'.strip()
                 })
                 if err:
                     st.error(err)
