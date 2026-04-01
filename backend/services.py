@@ -218,67 +218,29 @@ class GameService:
         if not fecha_activa:
             return None, "No hay fecha activa para jugar actualmente", 404
 
-        # Guardar cada jugada
+        # Guardar cada jugada y recolectar sus IDs
+        ids_creados = []
         for j_raw in jugadas_raw:
             j_bin = codificar_jugada(j_raw)
             nueva = JugadaUsuario(
                 usuario_id=usuario.id,
-                usuario_dni=str(usuario.dni or usuario.numero_de_socio), # Legacy
+                usuario_dni=str(usuario.dni or usuario.numero_de_socio),  # Legacy
                 nro_fecha=fecha_activa.nro_fecha,
                 fecha_sorteo_id=fecha_activa.id,
                 jugada_binaria=j_bin,
                 monto_apostado=1
             )
             db.session.add(nueva)
+            db.session.flush()  # Obtener el ID antes del commit
+            ids_creados.append(nueva.id)
             usuario.fichas -= 1
 
         db.session.commit()
-        return {'message': f'Se guardaron {len(jugadas_raw)} jugadas correctamente', 'fichas_restantes': usuario.fichas}, None, 201
-
-            if not fecha_activa:
-                return None, "No hay una fecha activa válida", 404
-
-            # Bloquear si la fecha activa ya comenzó
-            ahora = ahora_ar()
-            partidos_ordenados = sorted(fecha_activa.partidos, key=lambda x: x.orden)
-            primer_partido_hora = next(
-                (p.fecha_hora for p in partidos_ordenados if getattr(p, 'fecha_hora', None)),
-                None
-            )
-            if primer_partido_hora and ahora >= primer_partido_hora:
-                return None, "La fecha ya comenzó. No se pueden registrar nuevas jugadas.", 403
-
-        # Regla: El usuario no puede tener más de una jugada en la misma fecha
-        ya_jugada = JugadaUsuario.query.filter_by(
-            usuario_dni=dni,
-            fecha_sorteo_id=fecha_activa.id
-        ).first()
-        if ya_jugada:
-            return None, "Ya jugaste esta fecha. No podés modificar una jugada guardada.", 409
-
-        ids_creados = []
-        for selecciones in jugadas_raw:
-            if len(selecciones) != len(fecha_activa.partidos):
-                continue
-
-            binario = codificar_jugada(selecciones)
-            nueva = JugadaUsuario(
-                usuario_dni=dni,
-                nro_fecha=fecha_activa.nro_fecha,
-                fecha_sorteo_id=fecha_activa.id,
-                jugada_binaria=binario,
-                monto_apostado=1
-            )
-            db.session.add(nueva)
-            db.session.flush()
-            ids_creados.append(nueva.id)
-
-        if not ids_creados:
-            return None, "Ninguna jugada fue válida (verificá que todos los partidos estén marcados)", 400
-
-        usuario.fichas -= len(ids_creados)
-        db.session.commit()
-        return {"fichas_restantes": usuario.fichas, "ids": ids_creados}, None, 201
+        return {
+            'message': f'Se guardaron {len(jugadas_raw)} jugadas correctamente',
+            'fichas_restantes': usuario.fichas,
+            'ids': ids_creados
+        }, None, 201
 
     @staticmethod
     def procesar_sorteo(jugada_id):
