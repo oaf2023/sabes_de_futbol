@@ -368,20 +368,19 @@ def obtener_detalle_jugada(jugada_id):
 @app.route('/api/historial/<dni_or_socio>', methods=['GET'])
 @require_auth
 def historial(dni_or_socio):
-    # Buscar al usuario autenticado por el token (puede ser DNI o nro_socio según token viejo/nuevo)
-    usuario_auth = UserService.buscar_usuario(request.current_user_dni)
-    # Buscar al usuario solicitado por la URL
-    usuario = UserService.buscar_usuario(dni_or_socio)
-
-    # Solo el propio usuario puede ver su historial (comparar por id interno)
-    if not usuario_auth or not usuario or usuario_auth.id != usuario.id:
-        return jsonify({'error': 'Acceso denegado'}), 403
-
+    # El token ya garantiza la identidad — usar directamente el usuario autenticado
+    usuario = UserService.buscar_usuario(request.current_user_dni)
     if not usuario:
         return jsonify({'error': 'Usuario no encontrado'}), 404
 
+    # Buscar jugadas por usuario_id (nuevo) O usuario_dni (registros legacy)
     jugadas = (JugadaUsuario.query
-               .filter_by(usuario_id=usuario.id)
+               .filter(
+                   db.or_(
+                       JugadaUsuario.usuario_id == usuario.id,
+                       JugadaUsuario.usuario_dni == usuario.dni
+                   )
+               )
                .order_by(JugadaUsuario.fecha_registro.desc()).all())
     res = []
     for j in jugadas:
@@ -421,7 +420,12 @@ def mi_jugada_activa():
         return jsonify({'jugada': None, 'motivo': 'sin_fixture'}), 200
 
     jugada = (JugadaUsuario.query
-              .filter_by(usuario_id=usuario.id, fecha_sorteo_id=fecha.id)
+              .filter(
+                  db.or_(
+                      db.and_(JugadaUsuario.usuario_id == usuario.id, JugadaUsuario.fecha_sorteo_id == fecha.id),
+                      db.and_(JugadaUsuario.usuario_dni == usuario.dni, JugadaUsuario.fecha_sorteo_id == fecha.id)
+                  )
+              )
               .order_by(JugadaUsuario.fecha_registro.desc())
               .first())
     if not jugada:
@@ -486,12 +490,9 @@ def mi_jugada_activa():
 @app.route('/api/usuario/<identificador>/fichas', methods=['GET'])
 @require_auth
 def gestionar_fichas(identificador):
-    u = UserService.buscar_usuario(identificador)
+    # Usar directamente el usuario autenticado por token
+    u = UserService.buscar_usuario(request.current_user_dni)
     if not u: return jsonify({'error': 'No existe'}), 404
-    # Solo el propio usuario puede ver sus fichas (comparar por id interno)
-    usuario_auth = UserService.buscar_usuario(request.current_user_dni)
-    if not usuario_auth or usuario_auth.id != u.id:
-        return jsonify({'error': 'Acceso denegado'}), 403
     return jsonify({'fichas': u.fichas}), 200
 
 
