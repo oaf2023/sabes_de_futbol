@@ -324,7 +324,10 @@ def sortear():
 
     # Verificar que la jugada pertenece al usuario autenticado
     jugada = JugadaUsuario.query.get(jugada_id)
-    if not jugada or jugada.usuario_dni != request.current_user_dni:
+    if not jugada:
+        return jsonify({'error': 'Jugada no encontrada o acceso denegado'}), 403
+    usuario_auth = UserService.buscar_usuario(request.current_user_dni)
+    if not usuario_auth or (jugada.usuario_id != usuario_auth.id and jugada.usuario_dni != usuario_auth.dni):
         return jsonify({'error': 'Jugada no encontrada o acceso denegado'}), 403
 
     from flask import current_app
@@ -339,8 +342,15 @@ def obtener_detalle_jugada(jugada_id):
     if not jugada:
         return jsonify({'error': 'Jugada no encontrada'}), 404
 
-    # Solo el dueño puede ver su jugada
-    if jugada.usuario_dni != request.current_user_dni:
+    # Solo el dueño puede ver su jugada (soporta token con nro_socio o DNI)
+    usuario_auth = UserService.buscar_usuario(request.current_user_dni)
+    if not usuario_auth:
+        return jsonify({'error': 'Usuario no encontrado'}), 404
+    pertenece = (
+        jugada.usuario_id == usuario_auth.id or
+        jugada.usuario_dni == usuario_auth.dni
+    )
+    if not pertenece:
         return jsonify({'error': 'Acceso denegado'}), 403
 
     fecha = FechaSorteo.query.get(jugada.fecha_sorteo_id)
