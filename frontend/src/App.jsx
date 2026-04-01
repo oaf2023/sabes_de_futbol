@@ -35,6 +35,16 @@ function App() {
 
   useEffect(() => {
     const t = setInterval(() => setAhora(new Date()), 1000);
+    // Cargar usuario desde sessionStorage al iniciar
+    const storedUser = sessionStorage.getItem('sabes_usuario');
+    const token = sessionStorage.getItem('jwt_token');
+    if (storedUser && token) {
+      try {
+        setUsuario(JSON.parse(storedUser));
+      } catch (e) {
+        console.error("Error parsing stored user", e);
+      }
+    }
     return () => clearInterval(t);
   }, []);
 
